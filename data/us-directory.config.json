@@ -1,0 +1,97 @@
+{
+  "generatedAt": "manual-seed",
+  "sources": {
+    "npi": {
+      "label": "NPPES NPI Registry / CMS",
+      "url": "https://npiregistry.cms.hhs.gov/api-page",
+      "api": "https://npiregistry.cms.hhs.gov/api/"
+    },
+    "clinicalTrials": {
+      "label": "ClinicalTrials.gov",
+      "url": "https://clinicaltrials.gov/data-api/api",
+      "api": "https://clinicaltrials.gov/api/v2/studies"
+    },
+    "cdc": {
+      "label": "CDC ASD Treatment",
+      "url": "https://www.cdc.gov/autism/treatment/index.html"
+    }
+  },
+  "states": ["CA", "NY", "TX", "FL", "IL"],
+  "maxPerQuery": 8,
+  "npiQueries": [
+    {
+      "category": "aba",
+      "type": "center",
+      "taxonomyDescription": "Behavior Analyst",
+      "tags": ["ABA", "Behavioral therapy", "NPI"]
+    },
+    {
+      "category": "speech",
+      "type": "doctor",
+      "taxonomyDescription": "Speech-Language Pathologist",
+      "tags": ["Speech therapy", "Language", "NPI"]
+    },
+    {
+      "category": "occupational",
+      "type": "doctor",
+      "taxonomyDescription": "Occupational Therapist",
+      "tags": ["Occupational therapy", "Sensory integration", "NPI"]
+    },
+    {
+      "category": "psychology",
+      "type": "doctor",
+      "taxonomyDescription": "Psychologist",
+      "tags": ["Psychology", "CBT", "NPI"]
+    },
+    {
+      "category": "psychiatry",
+      "type": "doctor",
+      "taxonomyDescription": "Child & Adolescent Psychiatry",
+      "tags": ["Child psychiatry", "Medication support", "NPI"]
+    },
+    {
+      "category": "pediatric",
+      "type": "doctor",
+      "taxonomyDescription": "Pediatrics",
+      "tags": ["Pediatrics", "Developmental screening", "NPI"]
+    },
+    {
+      "category": "dentist",
+      "type": "doctor",
+      "taxonomyDescription": "Pediatric Dentistry",
+      "tags": ["Pediatric dentist", "Sensory-friendly candidate", "NPI"]
+    }
+  ],
+  "treatmentApproaches": [
+    {
+      "id": "behavioral",
+      "title": "Behavioral approaches",
+      "summary": "Includes ABA-based approaches that focus on behavior, skills, and progress tracking.",
+      "source": "CDC ASD Treatment"
+    },
+    {
+      "id": "developmental",
+      "title": "Developmental therapies",
+      "summary": "Includes speech therapy, language therapy, occupational therapy, and physical therapy.",
+      "source": "CDC ASD Treatment"
+    },
+    {
+      "id": "educational",
+      "title": "Educational approaches",
+      "summary": "Structured school-based supports such as visual routines and adapted instruction.",
+      "source": "CDC ASD Treatment"
+    },
+    {
+      "id": "psychological",
+      "title": "Psychological support",
+      "summary": "CBT and related supports can help with anxiety, depression, and emotional regulation.",
+      "source": "CDC ASD Treatment"
+    },
+    {
+      "id": "medication",
+      "title": "Medication for co-occurring symptoms",
+      "summary": "Medication does not treat core ASD symptoms, but may support sleep, attention, anxiety, seizures, or self-injury under medical supervision.",
+      "source": "CDC ASD Treatment"
+    }
+  ]
+}
