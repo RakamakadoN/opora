@@ -10,3 +10,4 @@ data/runtime-care-state.json
 data/runtime-auth-state.json
 .antigravity/
 .vscode/
+.vercel
