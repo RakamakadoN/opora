@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import dotenv from "dotenv";
+import { Pool } from "pg";
 
 dotenv.config();
 
@@ -20,8 +21,31 @@ app.get("/api/health", (_req, res) => {
     ok: true,
     service: "opora",
     environment: process.env.NODE_ENV || "development",
+    database: postgresConfig() ? "postgres" : supabaseConfig() ? "supabase" : "local-json",
     timestamp: new Date().toISOString()
   });
+});
+
+app.get("/api/db/status", async (_req, res) => {
+  try {
+    if (postgresConfig()) {
+      const result = await pgQuery<{ now: string; requests: string }>(
+        "select now()::text, (select count(*)::text from doctor_care_requests) as requests"
+      );
+      return res.json({
+        ok: true,
+        provider: "postgres",
+        timestamp: result.rows[0]?.now,
+        doctorCareRequests: Number(result.rows[0]?.requests || 0)
+      });
+    }
+    if (supabaseConfig()) {
+      return res.json({ ok: true, provider: "supabase" });
+    }
+    return res.json({ ok: true, provider: "local-json" });
+  } catch (error: any) {
+    res.status(500).json({ ok: false, provider: "postgres", error: error?.message || "database unavailable" });
+  }
 });
 
 type AppRole = "parent" | "doctor" | "admin";
@@ -100,6 +124,52 @@ const readLocalCareState = async (): Promise<CareState> => {
 const writeLocalCareState = async (state: CareState) => {
   await mkdir(path.dirname(runtimeStatePath), { recursive: true });
   await writeFile(runtimeStatePath, JSON.stringify(state, null, 2), "utf8");
+};
+
+let pgPool: Pool | null = null;
+let postgresReadyPromise: Promise<void> | null = null;
+
+const postgresConfig = () => {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) return null;
+  return {
+    connectionString,
+    ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false }
+  };
+};
+
+const getPgPool = () => {
+  const config = postgresConfig();
+  if (!config) return null;
+  if (!pgPool) {
+    pgPool = new Pool({
+      ...config,
+      max: Number(process.env.PG_POOL_MAX || 5),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 8_000
+    });
+  }
+  return pgPool;
+};
+
+const ensurePostgresSchema = async () => {
+  const pool = getPgPool();
+  if (!pool) return;
+  if (!postgresReadyPromise) {
+    postgresReadyPromise = (async () => {
+      const schemaPath = path.join(process.cwd(), "db", "railway-postgres.sql");
+      const schema = await readFile(schemaPath, "utf8");
+      await pool.query(schema);
+    })();
+  }
+  await postgresReadyPromise;
+};
+
+const pgQuery = async <T = any>(sql: string, values: any[] = []) => {
+  const pool = getPgPool();
+  if (!pool) throw new Error("DATABASE_URL is not configured");
+  await ensurePostgresSchema();
+  return pool.query<T>(sql, values);
 };
 
 const isUuid = (value?: string) => Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
@@ -196,12 +266,123 @@ const auditToDb = (log: AccessAuditLogApi) => {
   return row;
 };
 
+const listPostgresCareRequests = async (childId?: string) => {
+  const result = childId
+    ? await pgQuery(
+      "select * from doctor_care_requests where child_id = $1 order by requested_at desc",
+      [childId]
+    )
+    : await pgQuery("select * from doctor_care_requests order by requested_at desc");
+  return result.rows.map(requestFromDb);
+};
+
+const insertPostgresCareRequest = async (request: DoctorCareRequestApi) => {
+  const row = requestToDb(request);
+  const result = await pgQuery(
+    `insert into doctor_care_requests (
+      child_id,
+      child_name,
+      child_age,
+      doctor_external_id,
+      doctor_name,
+      doctor_title,
+      doctor_city,
+      requested_at,
+      doctor_accepted_at,
+      first_consult_at,
+      parent_confirmed_at,
+      status,
+      parent_note
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::care_request_status, $13)
+    returning *`,
+    [
+      row.child_id,
+      row.child_name,
+      row.child_age,
+      row.doctor_external_id,
+      row.doctor_name,
+      row.doctor_title,
+      row.doctor_city,
+      row.requested_at,
+      row.doctor_accepted_at,
+      row.first_consult_at,
+      row.parent_confirmed_at,
+      row.status,
+      row.parent_note
+    ]
+  );
+  return requestFromDb(result.rows[0]);
+};
+
+const updatePostgresCareRequestStatus = async (id: string, patch: Partial<DoctorCareRequestApi>) => {
+  if (!isUuid(id)) return undefined;
+  const result = await pgQuery(
+    `update doctor_care_requests
+      set status = $2::care_request_status,
+          doctor_accepted_at = coalesce($3::timestamptz, doctor_accepted_at),
+          first_consult_at = coalesce($4::timestamptz, first_consult_at),
+          parent_confirmed_at = coalesce($5::timestamptz, parent_confirmed_at)
+      where id = $1
+      returning *`,
+    [id, patch.status, patch.doctorAcceptedAt || null, patch.firstConsultAt || null, patch.parentConfirmedAt || null]
+  );
+  return result.rows[0] ? requestFromDb(result.rows[0]) : undefined;
+};
+
+const insertPostgresAuditLog = async (log: AccessAuditLogApi) => {
+  const row = auditToDb(log);
+  const result = await pgQuery(
+    `insert into access_audit_logs (
+      actor_role,
+      actor_name,
+      action,
+      child_id,
+      doctor_external_id,
+      request_id,
+      created_at,
+      note
+    ) values ($1::app_role, $2, $3::audit_action, $4, $5, $6, $7, $8)
+    returning *`,
+    [
+      row.actor_role,
+      row.actor_name,
+      row.action,
+      row.child_id,
+      row.doctor_external_id,
+      row.request_id,
+      row.created_at,
+      row.note
+    ]
+  );
+  return auditFromDb(result.rows[0]);
+};
+
+const listPostgresAuditLogs = async (childId?: string) => {
+  const result = childId
+    ? await pgQuery(
+      "select * from access_audit_logs where child_id = $1 order by created_at desc",
+      [childId]
+    )
+    : await pgQuery("select * from access_audit_logs order by created_at desc");
+  return result.rows.map(auditFromDb);
+};
+
 const addAuditLog = async (log: AccessAuditLogApi) => {
   const payload = {
     ...log,
     id: log.id || `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     createdAt: log.createdAt || new Date().toISOString()
   };
+
+  if (postgresConfig()) {
+    return insertPostgresAuditLog(payload).catch(async (error) => {
+      console.warn("Audit Postgres write failed; using local fallback:", error?.message || error);
+      const state = await readLocalCareState();
+      state.accessAuditLogs = [payload, ...state.accessAuditLogs].slice(0, 200);
+      await writeLocalCareState(state);
+      return payload;
+    });
+  }
 
   if (supabaseConfig()) {
     const rows = await supabaseFetch("access_audit_logs", {
@@ -226,6 +407,10 @@ const addAuditLog = async (log: AccessAuditLogApi) => {
 app.get("/api/doctor-care/requests", async (req, res) => {
   const childId = String(req.query.childId || "");
   try {
+    if (postgresConfig()) {
+      const items = await listPostgresCareRequests(childId || undefined);
+      return res.json({ items, source: "postgres" });
+    }
     if (supabaseConfig()) {
       const query = childId
         ? `?child_id=eq.${encodeURIComponent(childId)}&order=requested_at.desc`
@@ -251,7 +436,9 @@ app.post("/api/doctor-care/requests", async (req, res) => {
   };
   try {
     let saved = request;
-    if (supabaseConfig()) {
+    if (postgresConfig()) {
+      saved = await insertPostgresCareRequest(request);
+    } else if (supabaseConfig()) {
       const rows = await supabaseFetch("doctor_care_requests", {
         method: "POST",
         body: JSON.stringify(requestToDb(request))
@@ -294,7 +481,9 @@ app.patch("/api/doctor-care/requests/:id/status", async (req, res) => {
 
   try {
     let saved: DoctorCareRequestApi | undefined;
-    if (supabaseConfig() && isUuid(id)) {
+    if (postgresConfig()) {
+      saved = await updatePostgresCareRequestStatus(id, patch);
+    } else if (supabaseConfig() && isUuid(id)) {
       const dbPatch: Record<string, any> = { status };
       if (patch.doctorAcceptedAt) dbPatch.doctor_accepted_at = patch.doctorAcceptedAt;
       if (patch.firstConsultAt) dbPatch.first_consult_at = patch.firstConsultAt;
@@ -353,6 +542,10 @@ app.patch("/api/doctor-care/requests/:id/status", async (req, res) => {
 app.get("/api/access-audit-logs", async (req, res) => {
   const childId = String(req.query.childId || "");
   try {
+    if (postgresConfig()) {
+      const items = await listPostgresAuditLogs(childId || undefined);
+      return res.json({ items, source: "postgres" });
+    }
     if (supabaseConfig()) {
       const query = childId
         ? `?child_id=eq.${encodeURIComponent(childId)}&order=created_at.desc`
@@ -907,6 +1100,18 @@ function getFallbackChatResponse(userMsg: string, profile: any): string {
 }
 
 async function startServer() {
+  if (postgresConfig()) {
+    try {
+      await ensurePostgresSchema();
+      console.log("Postgres schema is ready.");
+    } catch (error: any) {
+      console.error("Postgres schema initialization failed:", error?.message || error);
+      if (process.env.NODE_ENV === "production") {
+        throw error;
+      }
+    }
+  }
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

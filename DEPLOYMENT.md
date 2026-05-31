@@ -12,12 +12,21 @@
    - `NODE_ENV=production`
    - `GEMINI_API_KEY` or `OPENROUTER_API_KEY`
    - `APP_URL` after Railway gives the public domain
-6. For production persistence, connect Supabase/Postgres:
+6. Add a Railway PostgreSQL database to the same project.
+7. Link the app service to the database so Railway injects:
+   - `DATABASE_URL`
+   - `PGSSLMODE=require`
+8. Optional alternative if using Supabase/PostgREST instead of Railway Postgres:
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
-   - optional later: `DATABASE_URL`
 
-Without Supabase env vars, the server uses a local JSON fallback for doctor access requests. That is useful for demos, but it is not durable on Railway restarts.
+When `DATABASE_URL` is present, the server applies `db/railway-postgres.sql` on startup and stores doctor care requests plus access audit logs in Postgres. Without database env vars, the server uses a local JSON fallback for demos; that fallback is not durable on Railway restarts.
+
+Manual migration command if needed:
+
+```bash
+npm run db:migrate
+```
 
 Healthcheck:
 
@@ -35,6 +44,7 @@ NODE_ENV=production PORT=5555 npm run start
 ```
 
 Open `http://localhost:5555/api/health`.
+Open `http://localhost:5555/api/db/status`.
 
 ## Release Checklist
 
@@ -42,9 +52,10 @@ Open `http://localhost:5555/api/health`.
 - `npm run build`
 - `NODE_ENV=production PORT=5555 npm run start`
 - `curl http://localhost:5555/api/health`
+- `curl http://localhost:5555/api/db/status`
 - Open the app and verify the main parent route plus doctor cabinet.
 - Set production env vars in Railway before public release.
 
 ## Notes
 
-The current app still stores part of the family profile in browser `localStorage`. Doctor access requests can already use Supabase/PostgREST when configured. True multi-device accounts need the next backend step: Supabase Auth plus Postgres-backed child profiles, journals, progress, and reports.
+The current app still stores part of the family profile in browser `localStorage`. Doctor access requests and access audit logs can use Railway Postgres through `DATABASE_URL`. True multi-device accounts need the next backend step: auth plus Postgres-backed child profiles, journals, progress, and reports.

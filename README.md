@@ -55,3 +55,5 @@ npm run start
 ```
 
 Переменные окружения описаны в `.env.example`.
+
+Для Railway Postgres добавьте database service в тот же проект и подключите `DATABASE_URL` к app service. При старте сервер автоматически применяет `db/railway-postgres.sql`.
