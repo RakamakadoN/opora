@@ -167,3 +167,15 @@ create index if not exists auth_sessions_user_expires_idx
 
 create index if not exists auth_sessions_token_hash_idx
   on auth_sessions(token_hash);
+
+alter table if exists public.app_users enable row level security;
+alter table if exists public.auth_sessions enable row level security;
+alter table if exists public.user_profile_state enable row level security;
+alter table if exists public.profiles enable row level security;
+alter table if exists public.children enable row level security;
+alter table if exists public.doctors enable row level security;
+alter table if exists public.sensory_passports enable row level security;
+alter table if exists public.doctor_care_requests enable row level security;
+alter table if exists public.access_audit_logs enable row level security;
+alter table if exists public.child_progress_entries enable row level security;
+alter table if exists public.diary_entries enable row level security;

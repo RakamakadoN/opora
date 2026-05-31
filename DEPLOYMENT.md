@@ -28,6 +28,29 @@ Manual migration command if needed:
 npm run db:migrate
 ```
 
+## Supabase Database
+
+Supabase project created for Opora:
+
+- Project: `opora`
+- Project ref: `okngykfqgayhngkaufol`
+- Region: `eu-central-1`
+- API URL: `https://okngykfqgayhngkaufol.supabase.co`
+- Database host: `db.okngykfqgayhngkaufol.supabase.co`
+
+Use this format for Railway `DATABASE_URL`:
+
+```text
+postgresql://postgres:<SUPABASE_DB_PASSWORD>@db.okngykfqgayhngkaufol.supabase.co:5432/postgres?sslmode=require
+```
+
+Get `<SUPABASE_DB_PASSWORD>` from Supabase Project Settings → Database. Do not commit it to GitHub.
+
+Applied migrations:
+
+- `initial_opora_schema`
+- `enable_rls_for_opora_tables`
+
 Healthcheck:
 
 ```text
