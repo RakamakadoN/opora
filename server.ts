@@ -6,6 +6,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import { Pool } from "pg";
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "crypto";
 
 dotenv.config();
 
@@ -48,6 +49,152 @@ app.get("/api/db/status", async (_req, res) => {
   }
 });
 
+app.post("/api/auth/register", async (req, res) => {
+  const email = normalizeEmail(String(req.body.email || ""));
+  const password = String(req.body.password || "");
+  const fullName = String(req.body.fullName || "Родитель").trim() || "Родитель";
+  const role: AppRole = req.body.role === "doctor" ? "doctor" : "parent";
+
+  if (!email.includes("@") || password.length < 8) {
+    return res.status(400).json({ error: "Введите email и пароль минимум 8 символов." });
+  }
+
+  try {
+    if (postgresConfig()) {
+      const existing = await pgQuery("select id from app_users where email = $1", [email]);
+      if (existing.rows[0]) return res.status(409).json({ error: "Такой email уже зарегистрирован." });
+      const inserted = await pgQuery(
+        `insert into app_users (email, full_name, role, password_hash)
+         values ($1, $2, $3::app_role, $4)
+         returning *`,
+        [email, fullName, role, hashPassword(password)]
+      );
+      const user = publicUser(inserted.rows[0]);
+      await createAuthSession(user.id, res);
+      return res.status(201).json({ user, isNewUser: true });
+    }
+
+    const state = await readLocalAuthState();
+    if (state.users.some(user => user.email === email)) {
+      return res.status(409).json({ error: "Такой email уже зарегистрирован." });
+    }
+    const localUser = {
+      id: randomUUID(),
+      email,
+      fullName,
+      full_name: fullName,
+      role,
+      createdAt: new Date().toISOString(),
+      passwordHash: hashPassword(password)
+    };
+    state.users.push(localUser as any);
+    await writeLocalAuthState(state);
+    const user = publicUser(localUser);
+    await createAuthSession(user.id, res);
+    res.status(201).json({ user, isNewUser: true });
+  } catch (error: any) {
+    console.error("Register API error:", error?.message || error);
+    res.status(500).json({ error: "Не удалось создать аккаунт." });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  const email = normalizeEmail(String(req.body.email || ""));
+  const password = String(req.body.password || "");
+
+  try {
+    if (postgresConfig()) {
+      const result = await pgQuery("select * from app_users where email = $1 limit 1", [email]);
+      const row = result.rows[0];
+      if (!row || !verifyPassword(password, row.password_hash)) {
+        return res.status(401).json({ error: "Неверный email или пароль." });
+      }
+      await pgQuery("update app_users set last_login_at = now() where id = $1", [row.id]);
+      const user = publicUser(row);
+      await createAuthSession(user.id, res);
+      return res.json({ user });
+    }
+
+    const state = await readLocalAuthState();
+    const found = state.users.find(user => user.email === email);
+    if (!found || !verifyPassword(password, found.passwordHash)) {
+      return res.status(401).json({ error: "Неверный email или пароль." });
+    }
+    const user = publicUser(found);
+    await createAuthSession(user.id, res);
+    res.json({ user });
+  } catch (error: any) {
+    console.error("Login API error:", error?.message || error);
+    res.status(500).json({ error: "Не удалось войти." });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  const user = await getAuthUserFromRequest(req);
+  res.json({ user });
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  const token = getSessionToken(req);
+  const tokenHash = token ? hashToken(token) : "";
+  try {
+    if (tokenHash && postgresConfig()) {
+      await pgQuery("delete from auth_sessions where token_hash = $1", [tokenHash]);
+    } else if (tokenHash) {
+      const state = await readLocalAuthState();
+      state.sessions = state.sessions.filter(session => session.tokenHash !== tokenHash);
+      await writeLocalAuthState(state);
+    }
+  } catch (error: any) {
+    console.warn("Logout cleanup failed:", error?.message || error);
+  }
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.get("/api/profile-state", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  try {
+    if (postgresConfig()) {
+      const result = await pgQuery("select state, updated_at from user_profile_state where user_id = $1", [user.id]);
+      return res.json({ state: result.rows[0]?.state || null, updatedAt: result.rows[0]?.updated_at || null });
+    }
+    const state = await readLocalAuthState();
+    res.json({ state: state.profileStates[user.id] || null, updatedAt: null });
+  } catch (error: any) {
+    console.error("Profile state read failed:", error?.message || error);
+    res.status(500).json({ error: "profile_state_unavailable" });
+  }
+});
+
+app.post("/api/profile-state", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  const statePayload = req.body?.state && typeof req.body.state === "object" ? req.body.state : {};
+  try {
+    if (postgresConfig()) {
+      await pgQuery(
+        `insert into user_profile_state (user_id, state, updated_at)
+         values ($1, $2, now())
+         on conflict (user_id)
+         do update set state = excluded.state, updated_at = now()`,
+        [user.id, JSON.stringify(statePayload)]
+      );
+      return res.json({ ok: true });
+    }
+    const state = await readLocalAuthState();
+    state.profileStates[user.id] = statePayload;
+    await writeLocalAuthState(state);
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Profile state save failed:", error?.message || error);
+    res.status(500).json({ error: "profile_state_save_failed" });
+  }
+});
+
 type AppRole = "parent" | "doctor" | "admin";
 type CareRequestStatus = "parent_requested" | "doctor_accepted" | "first_consult_done" | "full_access" | "declined";
 
@@ -85,7 +232,28 @@ type CareState = {
   accessAuditLogs: AccessAuditLogApi[];
 };
 
+type AuthUser = {
+  id: string;
+  email: string;
+  fullName: string;
+  role: AppRole;
+  createdAt: string;
+};
+
+type AuthState = {
+  users: Array<AuthUser & { passwordHash: string }>;
+  sessions: Array<{
+    id: string;
+    userId: string;
+    tokenHash: string;
+    createdAt: string;
+    expiresAt: string;
+  }>;
+  profileStates: Record<string, any>;
+};
+
 const runtimeStatePath = path.join(process.cwd(), "data", "runtime-care-state.json");
+const runtimeAuthPath = path.join(process.cwd(), "data", "runtime-auth-state.json");
 
 const defaultCareState = (): CareState => ({
   doctorCareRequests: [
@@ -124,6 +292,27 @@ const readLocalCareState = async (): Promise<CareState> => {
 const writeLocalCareState = async (state: CareState) => {
   await mkdir(path.dirname(runtimeStatePath), { recursive: true });
   await writeFile(runtimeStatePath, JSON.stringify(state, null, 2), "utf8");
+};
+
+const readLocalAuthState = async (): Promise<AuthState> => {
+  try {
+    const raw = await readFile(runtimeAuthPath, "utf8");
+    const parsed = JSON.parse(raw);
+    return {
+      users: Array.isArray(parsed.users) ? parsed.users : [],
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
+      profileStates: parsed.profileStates && typeof parsed.profileStates === "object" ? parsed.profileStates : {}
+    };
+  } catch {
+    const initial: AuthState = { users: [], sessions: [], profileStates: {} };
+    await writeLocalAuthState(initial);
+    return initial;
+  }
+};
+
+const writeLocalAuthState = async (state: AuthState) => {
+  await mkdir(path.dirname(runtimeAuthPath), { recursive: true });
+  await writeFile(runtimeAuthPath, JSON.stringify(state, null, 2), "utf8");
 };
 
 let pgPool: Pool | null = null;
@@ -264,6 +453,124 @@ const auditToDb = (log: AccessAuditLogApi) => {
   };
   if (isUuid(log.id)) row.id = log.id;
   return row;
+};
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+const hashToken = (token: string) => scryptSync(token, "opora-session-v1", 32).toString("hex");
+
+const hashPassword = (password: string) => {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+};
+
+const verifyPassword = (password: string, storedHash: string) => {
+  const [, salt, hash] = storedHash.split(":");
+  if (!salt || !hash) return false;
+  const candidate = scryptSync(password, salt, 64);
+  const stored = Buffer.from(hash, "hex");
+  return stored.length === candidate.length && timingSafeEqual(stored, candidate);
+};
+
+const publicUser = (row: any): AuthUser => ({
+  id: row.id,
+  email: row.email,
+  fullName: row.full_name || row.fullName || "Родитель",
+  role: row.role || "parent",
+  createdAt: row.created_at || row.createdAt || new Date().toISOString()
+});
+
+const parseCookies = (cookieHeader = "") => Object.fromEntries(
+  cookieHeader
+    .split(";")
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const index = part.indexOf("=");
+      if (index === -1) return [part, ""];
+      return [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
+    })
+);
+
+const setSessionCookie = (res: express.Response, token: string, expiresAt: Date) => {
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  res.setHeader(
+    "Set-Cookie",
+    `opora_session=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Expires=${expiresAt.toUTCString()}${secure}`
+  );
+};
+
+const clearSessionCookie = (res: express.Response) => {
+  res.setHeader("Set-Cookie", "opora_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+};
+
+const getSessionToken = (req: express.Request) => {
+  const cookies = parseCookies(req.headers.cookie || "");
+  return cookies.opora_session || "";
+};
+
+const createAuthSession = async (userId: string, res: express.Response) => {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
+  const sessionId = randomUUID();
+
+  if (postgresConfig()) {
+    await pgQuery(
+      `insert into auth_sessions (id, user_id, token_hash, expires_at)
+       values ($1, $2, $3, $4)`,
+      [sessionId, userId, tokenHash, expiresAt.toISOString()]
+    );
+  } else {
+    const state = await readLocalAuthState();
+    state.sessions = [
+      {
+        id: sessionId,
+        userId,
+        tokenHash,
+        createdAt: new Date().toISOString(),
+        expiresAt: expiresAt.toISOString()
+      },
+      ...state.sessions.filter(session => new Date(session.expiresAt).getTime() > Date.now())
+    ].slice(0, 500);
+    await writeLocalAuthState(state);
+  }
+
+  setSessionCookie(res, token, expiresAt);
+};
+
+const getAuthUserFromRequest = async (req: express.Request): Promise<AuthUser | null> => {
+  const token = getSessionToken(req);
+  if (!token) return null;
+  const tokenHash = hashToken(token);
+
+  if (postgresConfig()) {
+    const result = await pgQuery(
+      `select app_users.*
+       from auth_sessions
+       join app_users on app_users.id = auth_sessions.user_id
+       where auth_sessions.token_hash = $1
+         and auth_sessions.expires_at > now()
+       limit 1`,
+      [tokenHash]
+    );
+    return result.rows[0] ? publicUser(result.rows[0]) : null;
+  }
+
+  const state = await readLocalAuthState();
+  const session = state.sessions.find(item => item.tokenHash === tokenHash && new Date(item.expiresAt).getTime() > Date.now());
+  if (!session) return null;
+  const user = state.users.find(item => item.id === session.userId);
+  return user ? publicUser(user) : null;
+};
+
+const requireAuth = async (req: express.Request, res: express.Response): Promise<AuthUser | null> => {
+  const user = await getAuthUserFromRequest(req);
+  if (!user) {
+    res.status(401).json({ error: "auth_required" });
+    return null;
+  }
+  return user;
 };
 
 const listPostgresCareRequests = async (childId?: string) => {

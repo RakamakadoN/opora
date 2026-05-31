@@ -9,6 +9,8 @@ import { ProfileTab } from './components/ProfileTab';
 import { CommunityTab } from './components/CommunityTab';
 import { DoctorCabinetTab } from './components/DoctorCabinetTab';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthScreen } from './components/AuthScreen';
 
 export type TabType = 'navigator' | 'ai' | 'directory' | 'community' | 'profile' | 'doctor';
 type DirectoryQuickFilter = 'recommendations' | undefined;
@@ -168,7 +170,29 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ProfileProvider>
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
+  );
+}
+
+function AuthenticatedApp() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <div className="rounded-3xl bg-white/80 px-6 py-5 text-sm font-bold text-opora-navy shadow-sm">
+          Загружаем личный кабинет...
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) return <AuthScreen />;
+
+  return (
+    <ProfileProvider key={user.id}>
       <AppContent />
     </ProfileProvider>
   );

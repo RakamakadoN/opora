@@ -640,6 +640,8 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return [];
   });
 
+  const [remoteProfileStateLoaded, setRemoteProfileStateLoaded] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('opora_app_role', appRole);
   }, [appRole]);
@@ -700,6 +702,91 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (saved === 'dark' || saved === 'light') return saved;
     return 'light';
   });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/profile-state')
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const state = data?.state;
+        if (state && Array.isArray(state.profiles) && state.profiles.length) {
+          setProfiles(state.profiles);
+          setActiveProfileId(state.activeProfileId || state.profiles[0].id);
+          setSavedArticles(Array.isArray(state.savedArticles) ? state.savedArticles : []);
+          setSavedCenters(Array.isArray(state.savedCenters) ? state.savedCenters : []);
+          setReadArticles(Array.isArray(state.readArticles) ? state.readArticles : []);
+          setDiaryEntries(Array.isArray(state.diaryEntries) ? state.diaryEntries : []);
+          setParentJournalEntries(Array.isArray(state.parentJournalEntries) ? state.parentJournalEntries : []);
+          setTherapySessions(Array.isArray(state.therapySessions) ? state.therapySessions : []);
+          setMedicalBookings(Array.isArray(state.medicalBookings) ? state.medicalBookings : []);
+          setProgressEntries(Array.isArray(state.progressEntries) ? state.progressEntries : []);
+          setParentTasks(Array.isArray(state.parentTasks) ? state.parentTasks : []);
+          setVisitCards(Array.isArray(state.visitCards) ? state.visitCards : []);
+          setHasSeenOnboarding(Boolean(state.hasSeenOnboarding));
+          if (state.appRole === 'doctor' || state.appRole === 'parent') setAppRoleState(state.appRole);
+          if (state.theme === 'dark' || state.theme === 'light') setTheme(state.theme);
+        }
+      })
+      .catch(error => {
+        console.warn('Profile state sync failed, using local browser state.', error);
+      })
+      .finally(() => {
+        if (!cancelled) setRemoteProfileStateLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remoteProfileStateLoaded) return;
+    const timeout = window.setTimeout(() => {
+      fetch('/api/profile-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: {
+            appRole,
+            profiles,
+            activeProfileId,
+            savedArticles,
+            savedCenters,
+            readArticles,
+            diaryEntries,
+            parentJournalEntries,
+            therapySessions,
+            medicalBookings,
+            progressEntries,
+            parentTasks,
+            visitCards,
+            hasSeenOnboarding,
+            theme
+          }
+        })
+      }).catch(error => {
+        console.warn('Profile state save failed, local state is still available.', error);
+      });
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [
+    remoteProfileStateLoaded,
+    appRole,
+    profiles,
+    activeProfileId,
+    savedArticles,
+    savedCenters,
+    readArticles,
+    diaryEntries,
+    parentJournalEntries,
+    therapySessions,
+    medicalBookings,
+    progressEntries,
+    parentTasks,
+    visitCards,
+    hasSeenOnboarding,
+    theme
+  ]);
 
   useEffect(() => {
     localStorage.setItem('opora_theme', theme);

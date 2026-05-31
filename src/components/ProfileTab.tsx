@@ -24,6 +24,7 @@ import {
   Share2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../context/AuthContext';
 
 const CENTERS_PRESET = [
   { id: 1, name: 'Asyl Miras (Фонд Булата Утемуратова)', city: 'Алматы, Астана и др.', desc: 'Бесплатные центры раннего вмешательства (до 3 лет) и другие программы.', tags: ['Бесплатно', 'Раннее вмешательство'], type: 'center', rating: 4.9 },
@@ -54,6 +55,7 @@ const MONTH_NAMES = [
 const WEEK_DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 export function ProfileTab() {
+  const { user, logout } = useAuth();
   const { 
     profile, 
     profiles,
@@ -304,6 +306,22 @@ export function ProfileTab() {
           )}
         </div>
         <p className="text-opora-text text-sm leading-relaxed mb-3">Данные ребенка, сенсорный паспорт, заметки и сохраненные материалы.</p>
+        <div className="mb-3 rounded-2xl border border-opora-sage/15 bg-white/70 px-3 py-2">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-opora-sage">Аккаунт</p>
+          <div className="mt-1 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-extrabold text-opora-navy">{user?.fullName || 'Родитель'}</p>
+              <p className="truncate text-xs text-opora-text">{user?.email}</p>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="shrink-0 rounded-xl bg-opora-sand px-3 py-2 text-xs font-extrabold text-opora-navy"
+            >
+              Выйти
+            </button>
+          </div>
+        </div>
 
         {/* Child Selector Badges */}
         <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">

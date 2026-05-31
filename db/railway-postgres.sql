@@ -43,6 +43,30 @@ create table if not exists profiles (
   created_at timestamptz not null default now()
 );
 
+create table if not exists app_users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  full_name text not null,
+  role app_role not null default 'parent',
+  password_hash text not null,
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz
+);
+
+create table if not exists auth_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references app_users(id) on delete cascade,
+  token_hash text not null unique,
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null
+);
+
+create table if not exists user_profile_state (
+  user_id uuid primary key references app_users(id) on delete cascade,
+  state jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists children (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid references profiles(id) on delete cascade,
@@ -137,3 +161,9 @@ create index if not exists doctor_care_requests_requested_idx
 
 create index if not exists access_audit_logs_child_created_idx
   on access_audit_logs(child_id, created_at desc);
+
+create index if not exists auth_sessions_user_expires_idx
+  on auth_sessions(user_id, expires_at desc);
+
+create index if not exists auth_sessions_token_hash_idx
+  on auth_sessions(token_hash);
