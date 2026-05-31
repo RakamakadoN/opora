@@ -1,5 +1,35 @@
 # Deployment
 
+## Vercel
+
+This repo is ready for Vercel:
+
+- Vite frontend is served from `dist`.
+- API requests are routed to `api/index.ts`.
+- `server.ts` exports the Express app for Vercel serverless functions.
+
+Required Vercel environment variables:
+
+- `NODE_ENV=production`
+- `DATABASE_URL=postgresql://postgres:<SUPABASE_DB_PASSWORD>@db.okngykfqgayhngkaufol.supabase.co:5432/postgres?sslmode=require`
+- `PGSSLMODE=require`
+- `GEMINI_API_KEY` or `OPENROUTER_API_KEY`
+
+Deploy from the GitHub repository and keep these settings:
+
+- Framework preset: `Vite`
+- Build command: `npm run build`
+- Output directory: `dist`
+
+After deploy, verify:
+
+```text
+/api/health
+/api/db/status
+```
+
+Do not use the local JSON fallback in production Vercel. Serverless file storage is ephemeral, so `DATABASE_URL` must be set before real users register.
+
 ## Railway
 
 1. Push the project to GitHub.

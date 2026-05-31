@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { mkdir, readFile, writeFile } from "fs/promises";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import dotenv from "dotenv";
@@ -10,7 +9,7 @@ import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "crypto";
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
 app.disable("x-powered-by");
@@ -1406,7 +1405,7 @@ function getFallbackChatResponse(userMsg: string, profile: any): string {
   return `Я вас очень внимательно слушаю. К сожалению, сейчас у меня временные технические трудности с доступом к облачной нейросети (квоты исчерпаны).\n\nПожалуйста, посмотрите разделы "Справочник" или "База знаний" в этом приложении — там собрана проверенная информация по центрам и статьям в Казахстане. Я скоро вернусь в строй!`;
 }
 
-async function startServer() {
+export async function startServer() {
   if (postgresConfig()) {
     try {
       await ensurePostgresSchema();
@@ -1420,6 +1419,7 @@ async function startServer() {
   }
 
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -1438,4 +1438,6 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
