@@ -21,7 +21,7 @@ const STAGES = [
     title: 'Диагностика', 
     desc: 'Какие обследования действительно необходимы, а какие нет. Поиск доказательных врачей.', 
     matchingStatus: "В процессе диагностики",
-    articleIds: ["red_flags", "rights_kz"]
+    articleIds: ["red_flags", "rights_kz", "disability_docs_flashcards"]
   },
   { 
     id: 3, 
@@ -42,7 +42,7 @@ const STAGES = [
     title: 'Социум', 
     desc: 'Подготовка к садику, инклюзивным классам или школе. Социализация и права семьи.', 
     matchingStatus: "Социализация и школа", // fallback/future
-    articleIds: ["rights_kz"]
+    articleIds: ["rights_kz", "disability_docs_flashcards", "preschool_queue_quiz"]
   },
 ];
 
