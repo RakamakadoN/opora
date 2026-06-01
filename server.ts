@@ -49,6 +49,8 @@ app.get("/api/db/status", async (_req, res) => {
 });
 
 app.post("/api/auth/register", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const email = normalizeEmail(String(req.body.email || ""));
   const password = String(req.body.password || "");
   const fullName = String(req.body.fullName || "Родитель").trim() || "Родитель";
@@ -98,6 +100,8 @@ app.post("/api/auth/register", async (req, res) => {
 });
 
 app.post("/api/auth/login", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const email = normalizeEmail(String(req.body.email || ""));
   const password = String(req.body.password || "");
 
@@ -129,11 +133,15 @@ app.post("/api/auth/login", async (req, res) => {
 });
 
 app.get("/api/auth/me", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const user = await getAuthUserFromRequest(req);
   res.json({ user });
 });
 
 app.post("/api/auth/logout", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const token = getSessionToken(req);
   const tokenHash = token ? hashToken(token) : "";
   try {
@@ -152,6 +160,8 @@ app.post("/api/auth/logout", async (req, res) => {
 });
 
 app.get("/api/profile-state", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const user = await requireAuth(req, res);
   if (!user) return;
 
@@ -169,6 +179,8 @@ app.get("/api/profile-state", async (req, res) => {
 });
 
 app.post("/api/profile-state", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
   const user = await requireAuth(req, res);
   if (!user) return;
 
@@ -312,6 +324,16 @@ const readLocalAuthState = async (): Promise<AuthState> => {
 const writeLocalAuthState = async (state: AuthState) => {
   await mkdir(path.dirname(runtimeAuthPath), { recursive: true });
   await writeFile(runtimeAuthPath, JSON.stringify(state, null, 2), "utf8");
+};
+
+const requiresPersistentDatabase = (res: express.Response) => {
+  if (!process.env.VERCEL || postgresConfig()) return false;
+
+  res.status(503).json({
+    error: "database_not_configured",
+    message: "Production auth requires DATABASE_URL. Add the Supabase Postgres connection string in Vercel."
+  });
+  return true;
 };
 
 let pgPool: Pool | null = null;
