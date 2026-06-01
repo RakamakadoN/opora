@@ -154,6 +154,32 @@ create table if not exists diary_entries (
   created_at timestamptz not null default now()
 );
 
+create table if not exists kz_directory_places (
+  id uuid primary key default gen_random_uuid(),
+  external_id text unique,
+  name text not null,
+  city text not null,
+  title text,
+  description text,
+  address text,
+  phone text,
+  website text,
+  source_url text,
+  source_label text not null default 'Google Places · требует проверки родителей',
+  verification_status text not null default 'needs_review',
+  tags jsonb not null default '[]'::jsonb,
+  place_type text not null default 'center',
+  rating numeric,
+  rating_count int not null default 0,
+  confidence_score numeric not null default 0.45,
+  parent_confirmed_count int not null default 0,
+  complaint_count int not null default 0,
+  last_checked_at timestamptz not null default now(),
+  raw jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists doctor_care_requests_child_status_idx
   on doctor_care_requests(child_id, status);
 
@@ -169,6 +195,17 @@ create index if not exists auth_sessions_user_expires_idx
 create index if not exists auth_sessions_token_hash_idx
   on auth_sessions(token_hash);
 
+create index if not exists kz_directory_places_city_status_idx
+  on kz_directory_places(city, verification_status);
+
+create index if not exists kz_directory_places_tags_gin_idx
+  on kz_directory_places using gin(tags);
+
+create index if not exists kz_directory_places_search_idx
+  on kz_directory_places using gin(
+    to_tsvector('simple', coalesce(name, '') || ' ' || coalesce(city, '') || ' ' || coalesce(address, '') || ' ' || coalesce(description, ''))
+  );
+
 alter table if exists public.app_users enable row level security;
 alter table if exists public.auth_sessions enable row level security;
 alter table if exists public.user_profile_state enable row level security;
@@ -180,4 +217,5 @@ alter table if exists public.doctor_care_requests enable row level security;
 alter table if exists public.access_audit_logs enable row level security;
 alter table if exists public.child_progress_entries enable row level security;
 alter table if exists public.diary_entries enable row level security;
+alter table if exists public.kz_directory_places enable row level security;
 `;

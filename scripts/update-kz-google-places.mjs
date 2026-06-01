@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Pool } from 'pg';
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = path.join(rootDir, 'data', 'kz-google-places.config.json');
@@ -127,6 +128,67 @@ export const KZ_GOOGLE_PLACES_ITEMS = ${JSON.stringify(items, null, 2)} as const
 await mkdir(path.dirname(jsonOutputPath), { recursive: true });
 await writeFile(jsonOutputPath, JSON.stringify(payload, null, 2), 'utf8');
 await writeFile(tsOutputPath, generated, 'utf8');
+
+if (process.env.DATABASE_URL) {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.PGSSLMODE === 'disable' ? false : { rejectUnauthorized: false },
+    max: 2
+  });
+
+  try {
+    for (const item of items) {
+      await pool.query(
+        `insert into kz_directory_places (
+          external_id, name, city, title, description, address, phone, website,
+          source_url, source_label, verification_status, tags, place_type,
+          rating, rating_count, confidence_score, last_checked_at, raw, updated_at
+        )
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, now(), $17::jsonb, now())
+        on conflict (external_id) do update set
+          name = excluded.name,
+          city = excluded.city,
+          title = excluded.title,
+          description = excluded.description,
+          address = excluded.address,
+          phone = excluded.phone,
+          website = excluded.website,
+          source_url = excluded.source_url,
+          source_label = excluded.source_label,
+          tags = excluded.tags,
+          place_type = excluded.place_type,
+          rating = excluded.rating,
+          rating_count = excluded.rating_count,
+          confidence_score = excluded.confidence_score,
+          last_checked_at = now(),
+          raw = excluded.raw,
+          updated_at = now()`,
+        [
+          item.placeId,
+          item.name,
+          item.city,
+          item.title,
+          item.desc,
+          item.address,
+          item.phone,
+          item.website || null,
+          item.sourceUrl || null,
+          item.sourceLabel,
+          item.verificationStatus,
+          JSON.stringify(item.tags || []),
+          item.type,
+          item.rating || null,
+          item.ratingCount || 0,
+          item.confidenceScore || 0.45,
+          JSON.stringify(item)
+        ]
+      );
+    }
+    console.log(`Upserted ${items.length} candidates into kz_directory_places.`);
+  } finally {
+    await pool.end();
+  }
+}
 
 console.log(`Generated ${items.length} Kazakhstan Google Places candidates.`);
 console.log(`JSON: ${path.relative(rootDir, jsonOutputPath)}`);

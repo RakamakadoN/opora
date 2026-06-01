@@ -648,6 +648,29 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    const loadKzCandidates = async () => {
+      try {
+        const response = await fetch('/api/directory/kz?limit=500');
+        if (!response.ok) throw new Error(`KZ directory API ${response.status}`);
+        const data = await response.json();
+        if (!cancelled && Array.isArray(data.items) && data.items.length) {
+          setItems(prev => mergeDirectoryItems(prev, data.items as DirectoryItem[]));
+        }
+      } catch (error) {
+        console.warn('Failed loading KZ Google Places candidates.', error);
+      }
+    };
+
+    loadKzCandidates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     localStorage.setItem('opora_directory_recommendations_v1', JSON.stringify(recommendations));
   }, [recommendations]);
 

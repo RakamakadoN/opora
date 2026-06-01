@@ -954,6 +954,97 @@ app.get("/api/directory/us", async (req, res) => {
   }
 });
 
+const kzPlaceFromDb = (row: any) => ({
+  id: Number(row.numeric_id || 0) || Math.abs(String(row.external_id || row.id).split("").reduce((acc, char) => acc + char.charCodeAt(0), 0)) + 900000,
+  placeId: row.external_id,
+  name: row.name,
+  city: row.city,
+  title: row.title || "Кандидат из Google Places",
+  desc: row.description || "Найдено через Google Places. Нужно проверить администратором и родителями перед рекомендацией.",
+  address: row.address,
+  website: row.website,
+  sourceUrl: row.source_url,
+  sourceLabel: row.source_label,
+  lastVerified: row.last_checked_at ? new Date(row.last_checked_at).toISOString().slice(0, 10) : undefined,
+  verificationStatus: row.verification_status || "needs_review",
+  tags: Array.isArray(row.tags) ? row.tags : [],
+  type: row.place_type || "center",
+  rating: Number(row.rating || 0),
+  ratingCount: Number(row.rating_count || 0),
+  phone: row.phone || "Контакт уточнить",
+  country: "KZ",
+  confidenceScore: Number(row.confidence_score || 0.45),
+  reviews: []
+});
+
+app.get("/api/directory/kz", async (req, res) => {
+  try {
+    const query = String(req.query.q || "").trim().toLowerCase();
+    const city = String(req.query.city || "").trim();
+    const status = String(req.query.status || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 200, 1), 500);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    if (postgresConfig()) {
+      const where: string[] = [];
+      const values: any[] = [];
+
+      if (city && city !== "Все города") {
+        values.push(city);
+        where.push(`city = $${values.length}`);
+      }
+      if (status) {
+        values.push(status);
+        where.push(`verification_status = $${values.length}`);
+      }
+      if (query) {
+        values.push(`%${query}%`);
+        where.push(`(lower(name) like $${values.length} or lower(city) like $${values.length} or lower(address) like $${values.length} or lower(description) like $${values.length})`);
+      }
+
+      values.push(limit);
+      const limitRef = `$${values.length}`;
+      values.push(offset);
+      const offsetRef = `$${values.length}`;
+      const whereSql = where.length ? `where ${where.join(" and ")}` : "";
+      const result = await pgQuery(
+        `select *, count(*) over()::int as total
+         from kz_directory_places
+         ${whereSql}
+         order by parent_confirmed_count desc, rating_count desc, updated_at desc
+         limit ${limitRef} offset ${offsetRef}`,
+        values
+      );
+
+      return res.json({
+        meta: {
+          source: "postgres",
+          generatedAt: new Date().toISOString(),
+          note: "Kazakhstan Google Places candidates require parent/admin verification."
+        },
+        total: result.rows[0]?.total || 0,
+        limit,
+        offset,
+        items: result.rows.map(kzPlaceFromDb)
+      });
+    }
+
+    res.json({
+      meta: { source: "generated-empty", note: "DATABASE_URL is not configured." },
+      total: 0,
+      limit,
+      offset,
+      items: []
+    });
+  } catch (error: any) {
+    console.error("KZ directory API error:", error?.message || error);
+    res.status(500).json({
+      error: "KZ directory is unavailable",
+      message: error?.message || "Kazakhstan directory failed."
+    });
+  }
+});
+
 type PodcastEpisode = {
   id: string;
   title: string;
