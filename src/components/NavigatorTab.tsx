@@ -1978,9 +1978,9 @@ export function NavigatorTab({
             onClick={() => onChangeTab?.('directory')}
             className="opora-home-bento min-h-[116px] p-3.5 text-left dark:border-white/10 dark:bg-slate-800"
           >
-            <span className="opora-home-picture small">🏥</span>
-            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">Специалисты</span>
-            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">Места, ABA, логопеды, ПМПК.</span>
+            <span className="opora-home-picture small">🤝</span>
+            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">База доверия</span>
+            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">Опыт родителей о местах и специалистах.</span>
           </button>
 
           <button
@@ -2010,8 +2010,8 @@ export function NavigatorTab({
           className="mt-3 flex w-full items-center justify-between rounded-2xl border border-dashed border-opora-sage/30 bg-white/85 px-4 py-3 text-left transition-all active:scale-[0.99] dark:border-white/10 dark:bg-slate-800"
         >
           <span>
-            <span className="block text-sm font-extrabold text-opora-navy dark:text-slate-50">Рекомендация от родителей</span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-opora-text dark:text-slate-300">Добавить место на проверку: врач, стрижка, стоматология или центр.</span>
+            <span className="block text-sm font-extrabold text-opora-navy dark:text-slate-50">Родители знают лучше всех</span>
+            <span className="mt-0.5 block text-[11px] leading-snug text-opora-text dark:text-slate-300">Поделитесь местом, где ребенку было бережно и понятно.</span>
           </span>
           <span className="rounded-xl bg-opora-sage/10 px-2.5 py-1.5 text-lg">🤝</span>
         </button>

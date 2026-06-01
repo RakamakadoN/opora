@@ -810,7 +810,28 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
     <div className="min-h-full flex flex-col pt-9 pb-8 bg-opora-sand">
       <div className="px-6 mb-3">
         <h1 className="font-serif text-[27px] font-medium text-opora-navy mb-1">Справочник</h1>
-        <p className="text-opora-text text-xs leading-relaxed">Проверенные специалисты, центры и дружелюбные места рядом с семьей.</p>
+        <p className="text-opora-text text-xs leading-relaxed">Живая база доверия: опыт родителей, проверка вручную и места, где детям было бережно.</p>
+      </div>
+
+      <div className="px-6 mb-3">
+        <button
+          type="button"
+          onClick={() => setFilter('recommendations')}
+          className="w-full rounded-[20px] border border-opora-sage/25 bg-white/90 p-4 text-left shadow-sm transition-all active:scale-[0.99] dark:border-white/10 dark:bg-slate-800"
+        >
+          <span className="mb-2 inline-flex rounded-full bg-opora-sage/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-opora-sage">
+            Главная ценность базы
+          </span>
+          <span className="block text-[18px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">
+            Никто не знает ребенка лучше родителя
+          </span>
+          <span className="mt-1.5 block text-[12px] leading-relaxed text-opora-text dark:text-slate-300">
+            Мы собираем не рекламные адреса, а живой опыт семей: где приняли спокойно, где дали паузу, кто умеет работать с сенсорикой и неговорящими детьми.
+          </span>
+          <span className="mt-3 inline-flex items-center rounded-2xl bg-opora-navy px-3 py-2 text-xs font-extrabold text-white">
+            Добавить родительский опыт
+          </span>
+        </button>
       </div>
 
       <div className="px-6 mb-3 space-y-2">
@@ -849,6 +870,25 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
       <div className="px-6 mb-2">
         <p className="text-[11px] font-bold uppercase tracking-wider text-opora-text/60 mb-2">Что ищем?</p>
         <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setFilter('recommendations')}
+            className={cn(
+              "opora-directory-scenario col-span-2 text-left p-3 rounded-2xl border transition-all active:scale-[0.98]",
+              filter === 'recommendations'
+                ? "bg-opora-navy text-white border-opora-navy"
+                : "opora-directory-filter border-opora-sage/25 text-opora-navy"
+            )}
+          >
+            <span className="text-xl leading-none">🤝</span>
+            <span className="block text-sm font-extrabold mt-2 leading-tight">Проверено семьями</span>
+            <span className={cn(
+              "block text-[11px] mt-0.5 leading-snug",
+              filter === 'recommendations' ? "text-white/75" : "text-opora-text/70"
+            )}>
+              добавить рекомендацию или посмотреть, что советуют родители
+            </span>
+          </button>
           {scenarioFilters.map(scenario => (
             <button
               key={scenario.id}
@@ -939,11 +979,21 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
       )}
 
       {filter === 'recommendations' && (
-        <div className="px-6 mb-1 flex items-center justify-between gap-3 text-xs">
-          <span className="font-bold text-opora-navy">Рекомендации родителей</span>
-          <span className="font-semibold text-opora-text/70">
-            {recommendations.filter(item => item.status === 'pending').length} на проверке
-          </span>
+        <div className="px-6 mb-3 space-y-2">
+          <div className="flex items-center justify-between gap-3 text-xs">
+            <span className="font-bold text-opora-navy dark:text-slate-50">Рекомендации родителей</span>
+            <span className="font-semibold text-opora-text/70 dark:text-slate-300">
+              {recommendations.filter(item => item.status === 'pending').length} на проверке
+            </span>
+          </div>
+          <div className="rounded-2xl border border-opora-sage/20 bg-opora-sage/10 p-3 dark:border-white/10 dark:bg-slate-800">
+            <p className="text-[12px] font-extrabold leading-snug text-opora-navy dark:text-slate-50">
+              Здесь важен не рейтинг учреждения, а реальный опыт семьи.
+            </p>
+            <p className="mt-1 text-[11px] leading-relaxed text-opora-text/80 dark:text-slate-300">
+              Пишите простыми словами: что помогло ребенку, где было спокойно, где специалист услышал родителя, а что стоит перепроверить перед визитом.
+            </p>
+          </div>
         </div>
       )}
 
@@ -953,9 +1003,9 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
           <>
             <form onSubmit={handleAddRecommendation} className="opora-directory-card p-4 rounded-[20px] shadow-sm space-y-3">
               <div>
-                <p className="text-base font-bold text-opora-navy">Предложить место</p>
+                <p className="text-base font-bold text-opora-navy">Поделиться родительским опытом</p>
                 <p className="text-xs text-opora-text/70 leading-relaxed mt-1">
-                  Родитель или опекун может оставить рекомендацию, а ты позже проверишь условия и подтвердишь попадание в справочник.
+                  Никто не знает ребенка так тонко, как родитель. Оставьте рекомендацию, а администратор проверит ее перед публикацией.
                 </p>
               </div>
 
@@ -995,7 +1045,7 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
                 value={recommendationNote}
                 onChange={(e) => setRecommendationNote(e.target.value)}
                 className="opora-directory-field w-full border border-black/5 py-2.5 px-3 rounded-2xl text-sm font-medium min-h-[92px] resize-none"
-                placeholder="Что родитель заметил: лечат ли особенных детей, спокойно ли реагируют, есть ли тихое время, седация, паузы..."
+                placeholder="Что вы заметили как родитель: ребенку дали паузу, не торопили, поняли сенсорику, нашли подход, объяснили план, приняли без осуждения..."
               />
 
               <input
