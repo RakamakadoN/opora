@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck } from 'lucide-react';
+import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
@@ -38,6 +38,27 @@ const helperActions = [
     icon: ClipboardList,
     tone: 'sage',
     prompt: 'Помоги подготовить ребенка с РАС к визиту: что сказать специалисту, что взять с собой и как снизить сенсорную нагрузку?'
+  }
+];
+
+const legalActions = [
+  {
+    label: 'Составить обращение',
+    hint: 'адресат и текст письма',
+    icon: FilePenLine,
+    prompt: 'Помоги составить официальное обращение в госорган РК. Ситуация: [коротко опишите, что произошло]. Город: [город]. Категория: алименты / инвалидность / детский сад / другое. Документы на руках: [перечислите]. Что хочу получить: [результат]. Определи адресата и подготовь письмо для ручной подачи через e-Otinish/eGov/канцелярию.'
+  },
+  {
+    label: 'Проверить ответ',
+    hint: 'найти противоречия',
+    icon: SearchCheck,
+    prompt: 'Проанализируй ответ госоргана РК на предмет противоречий и проигнорированных прав. Моя просьба была: [вставьте кратко]. Ответ органа: [вставьте полный текст ответа]. Проверь, удовлетворена ли просьба, есть ли отписка, какие права ребенка или родителя могли быть проигнорированы.'
+  },
+  {
+    label: 'Подготовить опровержение',
+    hint: 'жалоба или эскалация',
+    icon: Scale,
+    prompt: 'Подготовь письмо-претензию/опровержение на ответ госоргана РК. Первичное обращение: [вставьте]. Полученный ответ: [вставьте]. Что, по моему мнению, проигнорировали: [перечислите]. Укажи следующую инстанцию и составь текст для ручной подачи.'
   }
 ];
 
@@ -176,6 +197,43 @@ export function AIAssistantTab() {
                   </span>
                   <span className="block text-sm font-extrabold text-opora-navy leading-tight">{action.label}</span>
                   <span className="block text-[11px] text-opora-text/75 mt-0.5 leading-snug">{action.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-opora-navy text-white">
+              <Scale size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                Письма и юридический контроль
+              </p>
+              <p className="text-xs font-bold leading-snug text-opora-navy">
+                Черновики для e-Otinish, eGov и письменных обращений
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            {legalActions.map(action => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => setInputValue(action.prompt)}
+                  className="flex min-h-[58px] items-center gap-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.98]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-opora-sage/10 text-opora-sage">
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-extrabold leading-tight text-opora-navy">{action.label}</span>
+                    <span className="block text-[11px] font-medium leading-snug text-opora-text/70">{action.hint}</span>
+                  </span>
                 </button>
               );
             })}
