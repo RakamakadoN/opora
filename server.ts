@@ -6,6 +6,7 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 import { Pool } from "pg";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "crypto";
+import { POSTGRES_SCHEMA_SQL } from "./db/postgres-schema";
 
 dotenv.config();
 
@@ -367,9 +368,7 @@ const ensurePostgresSchema = async () => {
   if (!pool) return;
   if (!postgresReadyPromise) {
     postgresReadyPromise = (async () => {
-      const schemaPath = path.join(process.cwd(), "db", "railway-postgres.sql");
-      const schema = await readFile(schemaPath, "utf8");
-      await pool.query(schema);
+      await pool.query(POSTGRES_SCHEMA_SQL);
     })();
   }
   await postgresReadyPromise;
