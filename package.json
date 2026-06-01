@@ -16,6 +16,7 @@
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "db:migrate": "node scripts/migrate-railway-postgres.mjs",
     "parse:directory": "node scripts/parse-directory-sources.mjs",
+    "update:kz-google-places": "node scripts/update-kz-google-places.mjs",
     "update:us-directory": "node scripts/update-us-directory.mjs"
   },
   "dependencies": {

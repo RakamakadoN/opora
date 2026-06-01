@@ -3,6 +3,7 @@ import { Search, MapPin, Star, Phone, Bookmark, X, MessageSquare, Send, Quote, U
 import { cn } from '../lib/utils';
 import { useProfile } from '../context/ProfileContext';
 import { VERIFIED_DIRECTORY_ITEMS } from '../data/directory.generated';
+import { KZ_GOOGLE_PLACES_ITEMS } from '../data/kz-google-places.generated';
 
 interface Review {
   id: string;
@@ -497,6 +498,7 @@ const mergeDirectoryItems = (...collections: DirectoryItem[][]) => {
 
 const DIRECTORY_SEED_ITEMS = mergeDirectoryItems(
   VERIFIED_DIRECTORY_ITEMS as unknown as DirectoryItem[],
+  KZ_GOOGLE_PLACES_ITEMS as unknown as DirectoryItem[],
   INITIAL_ITEMS
 );
 
