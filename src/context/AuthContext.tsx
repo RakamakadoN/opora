@@ -26,6 +26,23 @@ const clearLocalAppData = () => {
     .forEach(key => localStorage.removeItem(key));
 };
 
+const readApiJson = async (response: Response) => {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: 'Сервер временно недоступен. Попробуйте еще раз чуть позже.' };
+  }
+};
+
+const getAuthErrorMessage = (data: any) => {
+  if (data?.error === 'database_not_configured') {
+    return 'База данных продакшена еще не подключена. Добавьте DATABASE_URL в Vercel.';
+  }
+  return data?.message || data?.error || 'Не удалось выполнить вход.';
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     fetch('/api/auth/me')
-      .then(response => response.json())
+      .then(response => (response.ok ? readApiJson(response) : { user: null }))
       .then(data => {
         if (!cancelled) setUser(data.user || null);
       })
@@ -58,9 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
       if (!response.ok) {
-        throw new Error(data.error || 'Не удалось выполнить вход.');
+        throw new Error(getAuthErrorMessage(data));
       }
       clearLocalAppData();
       setUser(data.user);
