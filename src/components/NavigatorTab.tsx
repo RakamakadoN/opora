@@ -4,6 +4,7 @@ import { MapPin, CheckCircle2, Circle, ArrowRight, BookOpen, Quote, Bookmark, X,
 import { useProfile, ARTICLES_DATABASE, DiagnosticStatus, type MessageTemplate, type ParentTask, type VisitCardDraft } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
 import { SciencePulse } from './SciencePulse';
+import { BureaucracyHelperScreen } from './BureaucracyHelperScreen';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
 
@@ -316,6 +317,7 @@ export function NavigatorTab({
   const [templatePreview, setTemplatePreview] = useState('');
   const [quickObservationType, setQuickObservationType] = useState<'success' | 'trigger' | 'routine' | 'note'>('note');
   const [quickObservationNote, setQuickObservationNote] = useState('');
+  const [navigatorSubscreen, setNavigatorSubscreen] = useState<'main' | 'bureaucracy'>('main');
   const [softScreeningDone, setSoftScreeningDone] = useState<boolean>(() => {
     const saved = localStorage.getItem(`opora_soft_screening_done_${profile.id}`);
     return saved === 'true';
@@ -1814,6 +1816,17 @@ export function NavigatorTab({
           )}
         </AnimatePresence>
       </div>
+    );
+  }
+
+  if (navigatorSubscreen === 'bureaucracy') {
+    return (
+      <BureaucracyHelperScreen
+        childId={profile.id}
+        childName={profile.childName}
+        diagnosticStatus={profile.diagnosticStatus}
+        onBack={() => setNavigatorSubscreen('main')}
+      />
     );
   }
 
