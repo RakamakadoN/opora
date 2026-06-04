@@ -7,6 +7,13 @@ import { SciencePulse } from './SciencePulse';
 import { BureaucracyHelperScreen } from './BureaucracyHelperScreen';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
+import {
+  calculateBureaucracyProgress,
+  getBureaucracyChecklist,
+  getNearestDeadline,
+  parseStoredBureaucracyState,
+  type BureaucracyDeadline
+} from '../lib/disabilityBureaucracy';
 
 
 const STAGES = [
@@ -1259,6 +1266,17 @@ export function NavigatorTab({
   const docs = pmpkData.docs;
   const totalDocsCount = docs.length;
   const checkedDocsCount = docs.filter(doc => checkedDocs[doc.id]).length;
+  const bureaucracyChecklist = getBureaucracyChecklist(profile.diagnosticStatus);
+  const storedBureaucracyState = parseStoredBureaucracyState<{
+    checkedIds: string[];
+    deadlines: BureaucracyDeadline[];
+    currentStage?: string;
+  }>(
+    localStorage.getItem(`opora_bureaucracy_helper_${profile.id}`),
+    { checkedIds: [], deadlines: [] }
+  );
+  const bureaucracyProgress = calculateBureaucracyProgress(bureaucracyChecklist, storedBureaucracyState.checkedIds || []);
+  const bureaucracyNearestDeadline = getNearestDeadline(storedBureaucracyState.deadlines || []);
   const observationCount = childProgress.length + childDiaryEntries.length;
   const hasNextStep = Boolean(upcomingBooking || checkedDocsCount > 0 || savedArticles.includes('rights_kz'));
   const pendingDoctorAccessConfirmation = doctorCareRequests
@@ -1836,6 +1854,41 @@ export function NavigatorTab({
         <span className="text-xs font-bold text-opora-sage uppercase tracking-wider">Опора сегодня</span>
         <h1 className="font-serif text-3xl font-medium text-opora-navy mb-1">Маршрут {profile.childName}</h1>
         <p className="text-opora-text text-base">Выберите один понятный шаг. Остальное не обязательно читать сейчас.</p>
+      </div>
+
+      <div className="px-6 mb-6">
+        <button
+          type="button"
+          onClick={() => setNavigatorSubscreen('bureaucracy')}
+          className="w-full rounded-2xl border border-black/5 bg-white p-5 text-left shadow-sm transition active:scale-[0.99]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="rounded-xl bg-opora-sage/10 p-2 text-opora-sage">
+                <FileText size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-opora-sage">МСЭ и документы</p>
+                <h3 className="mt-1 font-serif text-[18px] font-bold leading-tight text-opora-navy">Бюрократический помощник</h3>
+                <p className="mt-1 text-xs leading-relaxed text-opora-text">
+                  {bureaucracyNearestDeadline
+                    ? `Ближайший срок: ${bureaucracyNearestDeadline.title}, ${bureaucracyNearestDeadline.date}`
+                    : 'Соберите документы, сроки и этапы в одном месте.'}
+                </p>
+              </div>
+            </div>
+            <ArrowRight size={18} className="mt-1 shrink-0 text-opora-text/50" />
+          </div>
+          <div className="mt-4">
+            <div className="mb-1 flex justify-between text-[11px] font-bold text-opora-text">
+              <span>Готовность</span>
+              <span>{bureaucracyProgress.checkedCount} из {bureaucracyProgress.totalCount}</span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-opora-sand">
+              <motion.div className="h-full rounded-full bg-opora-sage" style={{ width: `${bureaucracyProgress.percent}%` }} />
+            </div>
+          </div>
+        </button>
       </div>
 
       {pendingDoctorAccessConfirmation && (
