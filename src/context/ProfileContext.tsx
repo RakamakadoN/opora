@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import type { DietRuleSummary, MedicationEventSummary } from '../lib/careTracker';
 
 export type DiagnosticStatus = 
   | "Только подозреваем" 
@@ -137,6 +138,57 @@ export interface VisitCardDraft {
   generatedAt: string;
 }
 
+export interface MedicationPlan {
+  id: string;
+  childId: string;
+  childName: string;
+  name: string;
+  doseText: string;
+  scheduleText: string;
+  foodRelation: string;
+  reminderTimes: string[];
+  reminderWindowMinutes: number;
+  repeatEveryMinutes: number;
+  startDate: string;
+  endDate?: string;
+  prescriber?: string;
+  note?: string;
+  active: boolean;
+}
+
+export interface MedicationEvent extends MedicationEventSummary {
+  planId: string;
+  createdAt: string;
+}
+
+export interface DietRule extends DietRuleSummary {
+  id: string;
+  createdAt: string;
+}
+
+export interface FoodLog {
+  id: string;
+  childId: string;
+  childName: string;
+  eatenAt: string;
+  foodText: string;
+  amountText?: string;
+  texture?: string;
+  reaction?: string;
+  note?: string;
+}
+
+export interface ReactionLog {
+  id: string;
+  childId: string;
+  childName: string;
+  happenedAt: string;
+  title: string;
+  intensity: 1 | 2 | 3 | 4 | 5;
+  possibleTrigger?: string;
+  note?: string;
+}
+
 export interface ProfileData {
   id: string;
   childName: string;
@@ -202,6 +254,23 @@ interface ProfileContextType {
   visitCards: VisitCardDraft[];
   createVisitCardFromBooking: (bookingId: string) => VisitCardDraft;
   createVisitCardForChild: (childId: string) => VisitCardDraft;
+  medicationPlans: MedicationPlan[];
+  medicationEvents: MedicationEvent[];
+  dietRules: DietRule[];
+  foodLogs: FoodLog[];
+  reactionLogs: ReactionLog[];
+  addMedicationPlan: (plan: Omit<MedicationPlan, 'id' | 'childName' | 'active'>) => MedicationPlan;
+  updateMedicationPlan: (id: string, plan: Partial<MedicationPlan>) => void;
+  deleteMedicationPlan: (id: string) => void;
+  recordMedicationEvent: (event: Omit<MedicationEvent, 'id' | 'childName' | 'createdAt'>) => MedicationEvent;
+  deleteMedicationEvent: (id: string) => void;
+  addDietRule: (rule: Omit<DietRule, 'id' | 'childName' | 'createdAt' | 'active'>) => DietRule;
+  updateDietRule: (id: string, rule: Partial<DietRule>) => void;
+  deleteDietRule: (id: string) => void;
+  addFoodLog: (log: Omit<FoodLog, 'id' | 'childName'>) => FoodLog;
+  deleteFoodLog: (id: string) => void;
+  addReactionLog: (log: Omit<ReactionLog, 'id' | 'childName'>) => ReactionLog;
+  deleteReactionLog: (id: string) => void;
 }
 
 const DEFAULT_SENSORY_PASSPORT: SensoryPassportData = {
@@ -656,6 +725,94 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return [];
   });
 
+  const [medicationPlans, setMedicationPlans] = useState<MedicationPlan[]>(() => {
+    const saved = localStorage.getItem('opora_medication_plans');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      {
+        id: 'med-plan-default-1',
+        childId: 'default-child-1',
+        childName: 'Алишер',
+        name: 'Витамин D',
+        doseText: '1 капля',
+        scheduleText: 'Каждый день в 09:00 после завтрака',
+        foodRelation: 'после завтрака',
+        reminderTimes: ['09:00'],
+        reminderWindowMinutes: 30,
+        repeatEveryMinutes: 15,
+        startDate: new Date().toISOString().slice(0, 10),
+        prescriber: 'Педиатр',
+        note: 'Пример записи. Сверьте назначения с врачом.',
+        active: true
+      }
+    ];
+  });
+
+  const [medicationEvents, setMedicationEvents] = useState<MedicationEvent[]>(() => {
+    const saved = localStorage.getItem('opora_medication_events');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [];
+  });
+
+  const [dietRules, setDietRules] = useState<DietRule[]>(() => {
+    const saved = localStorage.getItem('opora_diet_rules');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      {
+        id: 'diet-rule-default-1',
+        childId: 'default-child-1',
+        childName: 'Алишер',
+        type: 'sensory',
+        title: 'Текстура без комочков',
+        details: 'Легче принимает мягкую однородную текстуру; новые продукты вводить отдельно.',
+        active: true,
+        createdAt: new Date().toISOString()
+      }
+    ];
+  });
+
+  const [foodLogs, setFoodLogs] = useState<FoodLog[]>(() => {
+    const saved = localStorage.getItem('opora_food_logs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [];
+  });
+
+  const [reactionLogs, setReactionLogs] = useState<ReactionLog[]>(() => {
+    const saved = localStorage.getItem('opora_reaction_logs');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [];
+  });
+
   const [remoteProfileStateLoaded, setRemoteProfileStateLoaded] = useState(false);
 
   useEffect(() => {
@@ -707,6 +864,21 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     localStorage.setItem('opora_visit_cards', JSON.stringify(visitCards));
   }, [visitCards]);
+  useEffect(() => {
+    localStorage.setItem('opora_medication_plans', JSON.stringify(medicationPlans));
+  }, [medicationPlans]);
+  useEffect(() => {
+    localStorage.setItem('opora_medication_events', JSON.stringify(medicationEvents));
+  }, [medicationEvents]);
+  useEffect(() => {
+    localStorage.setItem('opora_diet_rules', JSON.stringify(dietRules));
+  }, [dietRules]);
+  useEffect(() => {
+    localStorage.setItem('opora_food_logs', JSON.stringify(foodLogs));
+  }, [foodLogs]);
+  useEffect(() => {
+    localStorage.setItem('opora_reaction_logs', JSON.stringify(reactionLogs));
+  }, [reactionLogs]);
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(() => {
     const saved = localStorage.getItem('opora_onboarding_completed');
@@ -739,6 +911,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setProgressEntries(Array.isArray(state.progressEntries) ? state.progressEntries : []);
           setParentTasks(Array.isArray(state.parentTasks) ? state.parentTasks : []);
           setVisitCards(Array.isArray(state.visitCards) ? state.visitCards : []);
+          setMedicationPlans(Array.isArray(state.medicationPlans) ? state.medicationPlans : []);
+          setMedicationEvents(Array.isArray(state.medicationEvents) ? state.medicationEvents : []);
+          setDietRules(Array.isArray(state.dietRules) ? state.dietRules : []);
+          setFoodLogs(Array.isArray(state.foodLogs) ? state.foodLogs : []);
+          setReactionLogs(Array.isArray(state.reactionLogs) ? state.reactionLogs : []);
           setHasSeenOnboarding(Boolean(state.hasSeenOnboarding));
           if (state.appRole === 'doctor' || state.appRole === 'parent') setAppRoleState(state.appRole);
           if (state.theme === 'dark' || state.theme === 'light') setTheme(state.theme);
@@ -776,6 +953,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
             progressEntries,
             parentTasks,
             visitCards,
+            medicationPlans,
+            medicationEvents,
+            dietRules,
+            foodLogs,
+            reactionLogs,
             hasSeenOnboarding,
             theme
           }
@@ -800,6 +982,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     progressEntries,
     parentTasks,
     visitCards,
+    medicationPlans,
+    medicationEvents,
+    dietRules,
+    foodLogs,
+    reactionLogs,
     hasSeenOnboarding,
     theme
   ]);
@@ -1280,6 +1467,93 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return card;
   };
 
+  const getChildName = (childId: string) => {
+    return profiles.find(item => item.id === childId)?.childName || profile.childName || 'Ребенок';
+  };
+
+  const addMedicationPlan = (planData: Omit<MedicationPlan, 'id' | 'childName' | 'active'>) => {
+    const plan: MedicationPlan = {
+      ...planData,
+      id: `med-plan-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(planData.childId),
+      active: true
+    };
+    setMedicationPlans(prev => [plan, ...prev]);
+    return plan;
+  };
+
+  const updateMedicationPlan = (id: string, plan: Partial<MedicationPlan>) => {
+    setMedicationPlans(prev => prev.map(item => item.id === id ? { ...item, ...plan } : item));
+  };
+
+  const deleteMedicationPlan = (id: string) => {
+    setMedicationPlans(prev => prev.filter(item => item.id !== id));
+    setMedicationEvents(prev => prev.filter(item => item.planId !== id));
+  };
+
+  const recordMedicationEvent = (eventData: Omit<MedicationEvent, 'id' | 'childName' | 'createdAt'>) => {
+    const event: MedicationEvent = {
+      ...eventData,
+      id: `med-event-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(eventData.childId),
+      createdAt: new Date().toISOString()
+    };
+    setMedicationEvents(prev => [event, ...prev]);
+    return event;
+  };
+
+  const deleteMedicationEvent = (id: string) => {
+    setMedicationEvents(prev => prev.filter(item => item.id !== id));
+  };
+
+  const addDietRule = (ruleData: Omit<DietRule, 'id' | 'childName' | 'createdAt' | 'active'>) => {
+    const rule: DietRule = {
+      ...ruleData,
+      id: `diet-rule-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(ruleData.childId),
+      active: true,
+      createdAt: new Date().toISOString()
+    };
+    setDietRules(prev => [rule, ...prev]);
+    return rule;
+  };
+
+  const updateDietRule = (id: string, rule: Partial<DietRule>) => {
+    setDietRules(prev => prev.map(item => item.id === id ? { ...item, ...rule } : item));
+  };
+
+  const deleteDietRule = (id: string) => {
+    setDietRules(prev => prev.filter(item => item.id !== id));
+  };
+
+  const addFoodLog = (logData: Omit<FoodLog, 'id' | 'childName'>) => {
+    const log: FoodLog = {
+      ...logData,
+      id: `food-log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(logData.childId)
+    };
+    setFoodLogs(prev => [log, ...prev]);
+    return log;
+  };
+
+  const deleteFoodLog = (id: string) => {
+    setFoodLogs(prev => prev.filter(item => item.id !== id));
+  };
+
+  const addReactionLog = (logData: Omit<ReactionLog, 'id' | 'childName'>) => {
+    const log: ReactionLog = {
+      ...logData,
+      id: `reaction-log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(logData.childId)
+    };
+    setReactionLogs(prev => [log, ...prev]);
+    return log;
+  };
+
+  const deleteReactionLog = (id: string) => {
+    setReactionLogs(prev => prev.filter(item => item.id !== id));
+  };
+
   const completeOnboarding = () => {
     setHasSeenOnboarding(true);
     localStorage.setItem('opora_onboarding_completed', 'true');
@@ -1347,7 +1621,24 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       renderTemplate,
       visitCards,
       createVisitCardFromBooking,
-      createVisitCardForChild
+      createVisitCardForChild,
+      medicationPlans,
+      medicationEvents,
+      dietRules,
+      foodLogs,
+      reactionLogs,
+      addMedicationPlan,
+      updateMedicationPlan,
+      deleteMedicationPlan,
+      recordMedicationEvent,
+      deleteMedicationEvent,
+      addDietRule,
+      updateDietRule,
+      deleteDietRule,
+      addFoodLog,
+      deleteFoodLog,
+      addReactionLog,
+      deleteReactionLog
     }}>
       {children}
     </ProfileContext.Provider>

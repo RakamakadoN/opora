@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Map, MessageSquareHeart, HeartHandshake, Compass, User, Stethoscope } from 'lucide-react';
+import { Map, MessageSquareHeart, HeartHandshake, Compass, User, Stethoscope, ClipboardList } from 'lucide-react';
 import { NavigatorTab } from './components/NavigatorTab';
 import { AIAssistantTab } from './components/AIAssistantTab';
 import { DirectoryTab } from './components/DirectoryTab';
@@ -8,11 +8,12 @@ import { Onboarding } from './components/Onboarding';
 import { ProfileTab } from './components/ProfileTab';
 import { CommunityTab } from './components/CommunityTab';
 import { DoctorCabinetTab } from './components/DoctorCabinetTab';
+import { CareTrackerTab } from './components/CareTrackerTab';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
 
-export type TabType = 'navigator' | 'ai' | 'directory' | 'community' | 'profile' | 'doctor';
+export type TabType = 'navigator' | 'ai' | 'tracker' | 'directory' | 'community' | 'profile' | 'doctor';
 type DirectoryQuickFilter = 'recommendations' | undefined;
 
 function AppContent() {
@@ -62,6 +63,8 @@ function AppContent() {
         );
       case 'ai':
         return <AIAssistantTab />;
+      case 'tracker':
+        return <CareTrackerTab />;
       case 'directory':
         return <DirectoryTab initialFilter={directoryQuickFilter} />;
       case 'profile':
@@ -127,6 +130,12 @@ function AppContent() {
                   label="Помощник" 
                   isActive={activeTab === 'ai'} 
                   onClick={() => setActiveTab('ai')} 
+                />
+                <NavItem
+                  icon={<ClipboardList size={22} strokeWidth={activeTab === 'tracker' ? 2.5 : 1.5} />}
+                  label="Трекер"
+                  isActive={activeTab === 'tracker'}
+                  onClick={() => setActiveTab('tracker')}
                 />
               </>
             )}

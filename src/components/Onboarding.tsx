@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useProfile, DiagnosticStatus } from '../context/ProfileContext';
+import { useAuth } from '../context/AuthContext';
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const { profile, updateProfile, completeOnboarding } = useProfile();
+  const { user, logout } = useAuth();
   
   const [step, setStep] = useState(0);
   const [childName, setChildName] = useState(profile.childName);
@@ -63,6 +65,25 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
           </div>
           <div className="w-8 h-8"></div>
         </div>
+
+        {user && (
+          <div className="mt-3 rounded-2xl border border-opora-sage/15 bg-white/75 px-3 py-2 shadow-sm">
+            <p className="text-[10px] font-extrabold uppercase tracking-wider text-opora-sage">Вы вошли</p>
+            <div className="mt-1 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-extrabold text-opora-navy">{user.fullName}</p>
+                <p className="truncate text-xs text-opora-text">{user.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={logout}
+                className="shrink-0 rounded-xl bg-opora-sand px-3 py-2 text-xs font-extrabold text-opora-navy"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 flex flex-col justify-center py-6">
