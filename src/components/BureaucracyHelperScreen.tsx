@@ -109,10 +109,15 @@ export function BureaucracyHelperScreen({
 
   const saveActiveRecord = () => {
     if (!activeDocument || !activeRecord) return;
-    const errors = validateBureaucracyDocumentRecord(activeDocument, activeRecord);
+    const nextRecord = {
+      ...activeRecord,
+      collected: true,
+      updatedAt: new Date().toISOString()
+    };
+    const errors = validateBureaucracyDocumentRecord(activeDocument, nextRecord);
     setDocumentErrors(errors);
     if (Object.keys(errors).length > 0) return;
-    updateRecord(activeDocument.id, activeRecord);
+    updateRecord(activeDocument.id, nextRecord);
   };
 
   const handleAttachment = (documentId: string, file: File | null) => {
@@ -363,7 +368,7 @@ export function BureaucracyHelperScreen({
                 </div>
               )}
               <button type="button" onClick={saveActiveRecord} className="w-full rounded-xl bg-opora-navy px-4 py-3 text-sm font-extrabold text-white active:scale-[0.98]">
-                Сохранить документ
+                Проверить и отметить собранным
               </button>
             </div>
           </section>
@@ -402,9 +407,22 @@ export function BureaucracyHelperScreen({
                     <p className="text-sm font-extrabold">{deadline.title}</p>
                     <p className="text-xs text-opora-text">{deadline.date}{deadline.time ? ` · ${deadline.time}` : ""}</p>
                   </div>
-                  <button type="button" onClick={() => exportCalendar(deadline)} className="rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-opora-navy shadow-sm">
-                    .ics
-                  </button>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => exportCalendar(deadline)}
+                      className="rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-opora-navy shadow-sm"
+                    >
+                      .ics
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setState(prev => ({ ...prev, deadlines: prev.deadlines.filter(item => item.id !== deadline.id) }))}
+                      className="rounded-xl bg-white px-3 py-2 text-xs font-extrabold text-opora-text shadow-sm"
+                    >
+                      Убрать
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

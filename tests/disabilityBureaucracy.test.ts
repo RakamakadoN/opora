@@ -5,6 +5,7 @@ import {
   calculateBureaucracyProgress,
   getBureaucracyChecklist,
   getNearestDeadline,
+  validateAttachment,
   validateBureaucracyDocumentRecord,
   type BureaucracyDeadline,
   type BureaucracyDocumentRecord
@@ -110,4 +111,10 @@ test("calendar reminder generation produces escaped ICS text", () => {
   assert.match(ics, /Алия/);
   assert.match(ics, /Взять справку\\nи копии/);
   assert.match(ics, /END:VCALENDAR/);
+});
+
+test("attachment validation accepts small images and rejects unsupported or large files", () => {
+  assert.equal(validateAttachment({ type: "image/png", size: 500_000 }), "");
+  assert.match(validateAttachment({ type: "text/plain", size: 10 }), /JPG|PNG|PDF/);
+  assert.match(validateAttachment({ type: "application/pdf", size: 2_000_000 }), /меньше/);
 });
