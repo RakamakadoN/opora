@@ -6,6 +6,7 @@ import Markdown from 'react-markdown';
 import { SciencePulse } from './SciencePulse';
 import confetti from 'canvas-confetti';
 import { cn } from '../lib/utils';
+import { InstitutionGuidePanel } from './InstitutionGuidePanel';
 
 
 const STAGES = [
@@ -2598,6 +2599,15 @@ export function NavigatorTab({
           </div>
         );
       })()}
+
+      {activeCategory === 'pmpk' && (
+        <InstitutionGuidePanel
+          childId={profile.id}
+          city={profile.userCity || 'Алматы'}
+          diagnosticStatus={profile.diagnosticStatus}
+          defaultKind="pmpk"
+        />
+      )}
 
       {/* ПМПК FAQ Accordion Component */}
       {activeCategory === 'pmpk' && (
