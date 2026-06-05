@@ -14,6 +14,7 @@ import {
   parseStoredBureaucracyState,
   type BureaucracyDeadline
 } from '../lib/disabilityBureaucracy';
+import { InstitutionGuidePanel } from './InstitutionGuidePanel';
 
 
 const STAGES = [
@@ -2664,6 +2665,15 @@ export function NavigatorTab({
           </div>
         );
       })()}
+
+      {activeCategory === 'pmpk' && (
+        <InstitutionGuidePanel
+          childId={profile.id}
+          city={profile.userCity || 'Алматы'}
+          diagnosticStatus={profile.diagnosticStatus}
+          defaultKind="pmpk"
+        />
+      )}
 
       {/* ПМПК FAQ Accordion Component */}
       {activeCategory === 'pmpk' && (

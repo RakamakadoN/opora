@@ -2,11 +2,13 @@ import React from 'react';
 import {
   AlertTriangle,
   BellRing,
+  CalendarCheck,
   CheckCircle2,
   ClipboardList,
   Clock,
   FileText,
   Plus,
+  Route,
   Salad,
   Stethoscope,
   Trash2,
@@ -24,8 +26,15 @@ import {
   getMedicationEventStatus,
   sortMedicationEventsForDay
 } from '../lib/careTracker';
+import {
+  buildMapsRouteUrl,
+  getGovernmentQueueReminder,
+  getGovernmentQueueStatus,
+  sortGovernmentQueueRecords,
+  type GovernmentQueueStatus
+} from '../lib/governmentQueueMonitor';
 
-type TrackerView = 'day' | 'meds' | 'food' | 'report';
+type TrackerView = 'day' | 'meds' | 'food' | 'queues' | 'report';
 
 const todayDate = () => new Date().toISOString().slice(0, 10);
 const nowLocalInput = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -47,6 +56,7 @@ export function CareTrackerTab() {
     dietRules,
     foodLogs,
     reactionLogs,
+    governmentQueueRecords,
     addMedicationPlan,
     deleteMedicationPlan,
     recordMedicationEvent,
@@ -56,7 +66,10 @@ export function CareTrackerTab() {
     addFoodLog,
     deleteFoodLog,
     addReactionLog,
-    deleteReactionLog
+    deleteReactionLog,
+    addGovernmentQueueRecord,
+    updateGovernmentQueueRecord,
+    deleteGovernmentQueueRecord
   } = useProfile();
 
   const [view, setView] = React.useState<TrackerView>('day');
@@ -75,6 +88,13 @@ export function CareTrackerTab() {
   const [reactionTitle, setReactionTitle] = React.useState('');
   const [reactionTrigger, setReactionTrigger] = React.useState('');
   const [reactionIntensity, setReactionIntensity] = React.useState<ReactionLog['intensity']>(3);
+  const [queueServiceTitle, setQueueServiceTitle] = React.useState('');
+  const [queueInstitutionName, setQueueInstitutionName] = React.useState('');
+  const [queueInstitutionAddress, setQueueInstitutionAddress] = React.useState('');
+  const [queueAppointmentAt, setQueueAppointmentAt] = React.useState(nowLocalInput());
+  const [queueNumber, setQueueNumber] = React.useState('');
+  const [currentQueueNumber, setCurrentQueueNumber] = React.useState('');
+  const [queueNote, setQueueNote] = React.useState('');
   const [reportCopied, setReportCopied] = React.useState(false);
 
   React.useEffect(() => {
@@ -87,6 +107,25 @@ export function CareTrackerTab() {
   const childFoodLogs = foodLogs.filter(log => log.childId === selectedChildId);
   const childReactionLogs = reactionLogs.filter(log => log.childId === selectedChildId);
   const childMedicationEvents = medicationEvents.filter(event => event.childId === selectedChildId);
+  const childQueueRecords = sortGovernmentQueueRecords(
+    governmentQueueRecords.filter(record => record.childId === selectedChildId),
+    new Date()
+  );
+
+  React.useEffect(() => {
+    const refreshQueueStatuses = () => {
+      governmentQueueRecords.forEach(record => {
+        const nextStatus = getGovernmentQueueStatus(record);
+        if (record.status !== nextStatus) {
+          updateGovernmentQueueRecord(record.id, { status: nextStatus });
+        }
+      });
+    };
+
+    refreshQueueStatuses();
+    const interval = window.setInterval(refreshQueueStatuses, 60_000);
+    return () => window.clearInterval(interval);
+  }, [governmentQueueRecords]);
 
   const plannedToday = childPlans.flatMap(plan => plan.reminderTimes.map(time => ({
     id: `${plan.id}-${time}`,
@@ -190,6 +229,31 @@ export function CareTrackerTab() {
     setReactionIntensity(3);
   };
 
+  const handleAddQueueRecord = () => {
+    const parsedQueueNumber = parsePositiveNumber(queueNumber);
+    const parsedCurrentQueueNumber = parsePositiveNumber(currentQueueNumber);
+    if (!queueServiceTitle.trim()) return;
+    if (!queueAppointmentAt && !parsedQueueNumber) return;
+
+    addGovernmentQueueRecord({
+      childId: selectedChildId,
+      serviceTitle: queueServiceTitle.trim(),
+      institutionName: queueInstitutionName.trim() || 'Госучреждение',
+      institutionAddress: queueInstitutionAddress.trim(),
+      appointmentAt: queueAppointmentAt ? new Date(queueAppointmentAt).toISOString() : undefined,
+      queueNumber: parsedQueueNumber,
+      currentQueueNumber: parsedCurrentQueueNumber,
+      note: queueNote.trim() || undefined
+    });
+    setQueueServiceTitle('');
+    setQueueInstitutionName('');
+    setQueueInstitutionAddress('');
+    setQueueAppointmentAt(nowLocalInput());
+    setQueueNumber('');
+    setCurrentQueueNumber('');
+    setQueueNote('');
+  };
+
   const handleCopyReport = async () => {
     try {
       await navigator.clipboard.writeText(reportText);
@@ -239,11 +303,12 @@ export function CareTrackerTab() {
           ))}
         </div>
 
-        <div className="mb-5 grid grid-cols-4 gap-1 rounded-2xl bg-white/80 p-1 shadow-sm">
+        <div className="mb-5 grid grid-cols-5 gap-1 rounded-2xl bg-white/80 p-1 shadow-sm">
           {[
             { id: 'day', label: 'День', icon: Clock },
             { id: 'meds', label: 'Лек.', icon: BellRing },
             { id: 'food', label: 'Еда', icon: Salad },
+            { id: 'queues', label: 'Очереди', icon: CalendarCheck },
             { id: 'report', label: 'Отчет', icon: FileText }
           ].map(item => {
             const Icon = item.icon;
@@ -444,6 +509,100 @@ export function CareTrackerTab() {
             </Panel>
           </section>
         )}
+
+        {view === 'queues' && (
+          <section className="space-y-4">
+            <Panel title="Добавить запись" icon={<CalendarCheck size={18} />}>
+              <FormField label="Услуга">
+                <input value={queueServiceTitle} onChange={e => setQueueServiceTitle(e.target.value)} placeholder="ПМПК, ЦОН, МСЭ" className={inputClass} />
+              </FormField>
+              <FormField label="Учреждение">
+                <input value={queueInstitutionName} onChange={e => setQueueInstitutionName(e.target.value)} placeholder="Название учреждения" className={inputClass} />
+              </FormField>
+              <FormField label="Адрес для маршрута">
+                <input value={queueInstitutionAddress} onChange={e => setQueueInstitutionAddress(e.target.value)} placeholder="Алматы, Абая 10" className={inputClass} />
+              </FormField>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Дата и время">
+                  <input type="datetime-local" value={queueAppointmentAt} onChange={e => setQueueAppointmentAt(e.target.value)} className={inputClass} />
+                </FormField>
+                <FormField label="Мой номер">
+                  <input inputMode="numeric" value={queueNumber} onChange={e => setQueueNumber(e.target.value)} placeholder="42" className={inputClass} />
+                </FormField>
+              </div>
+              <FormField label="Сейчас обслуживают">
+                <input inputMode="numeric" value={currentQueueNumber} onChange={e => setCurrentQueueNumber(e.target.value)} placeholder="Если известно" className={inputClass} />
+              </FormField>
+              <FormField label="Заметка">
+                <textarea value={queueNote} onChange={e => setQueueNote(e.target.value)} placeholder="Какие документы взять, кабинет, контакт" className={`${inputClass} min-h-20 resize-none`} />
+              </FormField>
+              <button type="button" onClick={handleAddQueueRecord} className="mt-2 w-full rounded-2xl bg-opora-navy px-4 py-3 text-sm font-extrabold text-white">
+                Сохранить запись
+              </button>
+            </Panel>
+
+            <Panel title="Активные очереди и визиты" icon={<BellRing size={18} />}>
+              {childQueueRecords.length ? (
+                <div className="space-y-2">
+                  {childQueueRecords.map(record => {
+                    const status = getGovernmentQueueStatus(record);
+                    const reminder = getGovernmentQueueReminder(record);
+                    return (
+                      <div key={record.id} className="rounded-2xl border border-opora-sage/15 bg-white px-4 py-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-extrabold text-opora-navy">{record.serviceTitle}</p>
+                            <p className="text-xs font-bold text-opora-sage">{record.institutionName}</p>
+                            {record.appointmentAt && <p className="mt-1 text-xs text-opora-text">{formatDateTime(record.appointmentAt)}</p>}
+                          </div>
+                          <QueueStatusPill status={status} />
+                        </div>
+                        {reminder && (
+                          <div className="mt-3 rounded-xl bg-opora-sage/10 px-3 py-2 text-xs font-extrabold text-opora-sage">
+                            {reminder.message}
+                          </div>
+                        )}
+                        {(record.queueNumber || record.currentQueueNumber) && (
+                          <p className="mt-3 text-xs text-opora-text">
+                            Очередь: {record.currentQueueNumber || 'неизвестно'} из {record.queueNumber || 'не указано'}
+                          </p>
+                        )}
+                        {record.note && <p className="mt-2 text-xs leading-relaxed text-opora-text">{record.note}</p>}
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <a
+                            href={record.institutionAddress ? buildMapsRouteUrl(record.institutionAddress) : undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-disabled={!record.institutionAddress}
+                            className={`flex min-h-10 items-center justify-center rounded-xl px-2 text-[11px] font-extrabold ${
+                              record.institutionAddress ? 'bg-opora-sage text-white' : 'pointer-events-none bg-opora-sand text-opora-text/50'
+                            }`}
+                          >
+                            <Route size={14} className="mr-1" /> Маршрут
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => updateGovernmentQueueRecord(record.id, { status: 'completed' })}
+                            className="flex min-h-10 items-center justify-center rounded-xl bg-opora-sand px-2 text-[11px] font-extrabold text-opora-navy"
+                          >
+                            <CheckCircle2 size={14} className="mr-1" /> Готово
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteGovernmentQueueRecord(record.id)}
+                            className="flex min-h-10 items-center justify-center rounded-xl bg-rose-50 px-2 text-[11px] font-extrabold text-rose-700"
+                          >
+                            <Trash2 size={14} className="mr-1" /> Удалить
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : <EmptyState text="Пока нет записей в госучреждения. Добавьте дату визита или номер очереди." />}
+            </Panel>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -500,6 +659,17 @@ function StatusPill({ status }: { status: ReturnType<typeof getMedicationEventSt
   return <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${config[1]}`}>{config[0]}</span>;
 }
 
+function QueueStatusPill({ status }: { status: GovernmentQueueStatus }) {
+  const config = {
+    waiting: ['Ожидаем', 'bg-opora-sand text-opora-navy'],
+    soon: ['Скоро', 'bg-amber-100 text-amber-800'],
+    ready: ['Подошла', 'bg-emerald-100 text-emerald-800'],
+    completed: ['Готово', 'bg-slate-100 text-slate-700'],
+    cancelled: ['Отменено', 'bg-rose-100 text-rose-800']
+  }[status];
+  return <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold ${config[1]}`}>{config[0]}</span>;
+}
+
 function ListCard({ title, subtitle, children, onDelete }: { title: string; subtitle: string; children?: React.ReactNode; onDelete: () => void }) {
   return (
     <div className="mb-2 rounded-2xl border border-opora-sage/15 bg-white px-4 py-3">
@@ -527,6 +697,20 @@ function EmptyState({ text }: { text: string }) {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+}
+
+function parsePositiveNumber(value: string) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function clampIntensity(value: string): ReactionLog['intensity'] {

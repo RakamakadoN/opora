@@ -7,6 +7,15 @@ import dotenv from "dotenv";
 import { Pool } from "pg";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "crypto";
 import { POSTGRES_SCHEMA_SQL } from "./db/postgres-schema";
+import {
+  buildInstitutionChecklist,
+  getDefaultInstitutionGuideSeed,
+  normalizeDocumentRow,
+  normalizeInstitutionRow,
+  type InstitutionGuide,
+  type InstitutionGuideDocument,
+  type InstitutionKind
+} from "./src/lib/institutionGuide";
 
 dotenv.config();
 
@@ -1042,6 +1051,272 @@ app.get("/api/directory/kz", async (req, res) => {
       error: "KZ directory is unavailable",
       message: error?.message || "Kazakhstan directory failed."
     });
+  }
+});
+
+const institutionRowFromGuide = (item: InstitutionGuide) => ({
+  id: item.id,
+  name: item.name,
+  kind: item.kind,
+  region_code: item.regionCode,
+  city: item.city,
+  district: item.district || null,
+  address: item.address || null,
+  phone: item.phone || null,
+  website: item.website || null,
+  source_url: item.sourceUrl || null,
+  source_label: item.sourceLabel,
+  verified_at: item.verifiedAt || null,
+  service_area_population: item.serviceAreaPopulation || null,
+  tags: item.tags,
+  metadata: item.metadata
+});
+
+const documentRowFromGuide = (item: InstitutionGuideDocument) => ({
+  id: item.id,
+  institution_id: item.institutionId || null,
+  institution_kind: item.institutionKind,
+  stage: item.stage,
+  title: item.title,
+  description: item.description,
+  required: item.required,
+  source: item.source,
+  sort_order: item.sortOrder,
+  applies_to_diagnostic_statuses: item.appliesToDiagnosticStatuses,
+  metadata: item.metadata
+});
+
+async function ensurePostgresInstitutionSeed() {
+  if (!postgresConfig()) return;
+  const count = await pgQuery<{ count: string }>("select count(*)::text from institution_guides");
+  if (Number(count.rows[0]?.count || 0) > 0) return;
+
+  const seed = getDefaultInstitutionGuideSeed();
+  for (const institution of seed.institutions) {
+    const row = institutionRowFromGuide(institution);
+    await pgQuery(
+      `insert into institution_guides
+       (id, name, kind, region_code, city, district, address, phone, website, source_url, source_label, verified_at, service_area_population, tags, metadata)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb)
+       on conflict (id) do update set
+         name = excluded.name,
+         kind = excluded.kind,
+         region_code = excluded.region_code,
+         city = excluded.city,
+         district = excluded.district,
+         address = excluded.address,
+         phone = excluded.phone,
+         website = excluded.website,
+         source_url = excluded.source_url,
+         source_label = excluded.source_label,
+         verified_at = excluded.verified_at,
+         service_area_population = excluded.service_area_population,
+         tags = excluded.tags,
+         metadata = excluded.metadata,
+         updated_at = now()`,
+      [
+        row.id,
+        row.name,
+        row.kind,
+        row.region_code,
+        row.city,
+        row.district,
+        row.address,
+        row.phone,
+        row.website,
+        row.source_url,
+        row.source_label,
+        row.verified_at,
+        row.service_area_population,
+        JSON.stringify(row.tags),
+        JSON.stringify(row.metadata)
+      ]
+    );
+  }
+
+  for (const document of seed.documents) {
+    const row = documentRowFromGuide(document);
+    await pgQuery(
+      `insert into institution_guide_documents
+       (id, institution_id, institution_kind, stage, title, description, required, source, sort_order, applies_to_diagnostic_statuses, metadata)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)
+       on conflict (id) do update set
+         institution_id = excluded.institution_id,
+         institution_kind = excluded.institution_kind,
+         stage = excluded.stage,
+         title = excluded.title,
+         description = excluded.description,
+         required = excluded.required,
+         source = excluded.source,
+         sort_order = excluded.sort_order,
+         applies_to_diagnostic_statuses = excluded.applies_to_diagnostic_statuses,
+         metadata = excluded.metadata,
+         updated_at = now()`,
+      [
+        row.id,
+        row.institution_id,
+        row.institution_kind,
+        row.stage,
+        row.title,
+        row.description,
+        row.required,
+        row.source,
+        row.sort_order,
+        JSON.stringify(row.applies_to_diagnostic_statuses),
+        JSON.stringify(row.metadata)
+      ]
+    );
+  }
+}
+
+const filterInstitutionSeed = (params: { city?: string; kind?: string; q?: string }) => {
+  const seed = getDefaultInstitutionGuideSeed();
+  const q = (params.q || "").toLowerCase();
+  const items = seed.institutions.filter(item => {
+    const matchesKind = !params.kind || item.kind === params.kind;
+    const matchesCity = !params.city || params.city === "Все города" || item.city === params.city || item.city === "Все города";
+    const text = [item.name, item.kind, item.city, item.district, item.address, ...item.tags].filter(Boolean).join(" ").toLowerCase();
+    const matchesQuery = !q || text.includes(q);
+    return matchesKind && matchesCity && matchesQuery;
+  });
+  return { items, documents: seed.documents };
+};
+
+app.get("/api/institutions", async (req, res) => {
+  try {
+    const city = String(req.query.city || "").trim();
+    const kind = String(req.query.kind || "").trim();
+    const query = String(req.query.q || "").trim().toLowerCase();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 300);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    if (postgresConfig()) {
+      await ensurePostgresInstitutionSeed();
+      const where: string[] = [];
+      const values: any[] = [];
+      if (city && city !== "Все города") {
+        values.push(city);
+        where.push(`(city = $${values.length} or city = 'Все города')`);
+      }
+      if (kind) {
+        values.push(kind);
+        where.push(`kind = $${values.length}`);
+      }
+      if (query) {
+        values.push(`%${query}%`);
+        where.push(`(lower(name) like $${values.length} or lower(city) like $${values.length} or lower(district) like $${values.length} or lower(address) like $${values.length})`);
+      }
+      values.push(limit);
+      const limitRef = `$${values.length}`;
+      values.push(offset);
+      const offsetRef = `$${values.length}`;
+      const whereSql = where.length ? `where ${where.join(" and ")}` : "";
+      const rows = await pgQuery(
+        `select *, count(*) over()::int as total
+         from institution_guides
+         ${whereSql}
+         order by service_area_population desc nulls last, city, kind, name
+         limit ${limitRef} offset ${offsetRef}`,
+        values
+      );
+      return res.json({
+        meta: { source: "postgres", generatedAt: new Date().toISOString() },
+        total: rows.rows[0]?.total || 0,
+        limit,
+        offset,
+        items: rows.rows.map(normalizeInstitutionRow)
+      });
+    }
+
+    if (supabaseConfig()) {
+      const filters: string[] = [];
+      if (city && city !== "Все города") filters.push(`or=(city.eq.${encodeURIComponent(city)},city.eq.${encodeURIComponent("Все города")})`);
+      if (kind) filters.push(`kind=eq.${encodeURIComponent(kind)}`);
+      if (query) filters.push(`or=(name.ilike.*${encodeURIComponent(query)}*,city.ilike.*${encodeURIComponent(query)}*,district.ilike.*${encodeURIComponent(query)}*)`);
+      filters.push("order=service_area_population.desc.nullslast,city.asc,kind.asc,name.asc");
+      filters.push(`limit=${limit}`);
+      filters.push(`offset=${offset}`);
+      const rows = await supabaseFetch("institution_guides", {}, `?${filters.join("&")}`).catch(() => []);
+      if (Array.isArray(rows) && rows.length) {
+        return res.json({
+          meta: { source: "supabase", generatedAt: new Date().toISOString() },
+          total: rows.length,
+          limit,
+          offset,
+          items: rows.map(normalizeInstitutionRow)
+        });
+      }
+    }
+
+    const fallback = filterInstitutionSeed({ city, kind, q: query });
+    res.json({
+      meta: { source: "seed", generatedAt: new Date().toISOString(), note: "Database rows unavailable; served built-in institution guide seed." },
+      total: fallback.items.length,
+      limit,
+      offset,
+      items: fallback.items.slice(offset, offset + limit)
+    });
+  } catch (error: any) {
+    console.error("Institution guide API error:", error?.message || error);
+    res.status(500).json({ error: "institution_guides unavailable" });
+  }
+});
+
+app.get("/api/institutions/:id/checklist", async (req, res) => {
+  try {
+    const diagnosticStatus = String(req.query.diagnosticStatus || "Диагноз подтвержден") as any;
+    const checkedDocumentIds = String(req.query.checked || "")
+      .split(",")
+      .map(item => item.trim())
+      .filter(Boolean);
+
+    let institution: InstitutionGuide | undefined;
+    let documents: InstitutionGuideDocument[] = [];
+
+    if (postgresConfig()) {
+      await ensurePostgresInstitutionSeed();
+      const institutionRows = await pgQuery("select * from institution_guides where id = $1 limit 1", [req.params.id]);
+      if (institutionRows.rows[0]) {
+        institution = normalizeInstitutionRow(institutionRows.rows[0]);
+        const documentRows = await pgQuery(
+          `select *
+           from institution_guide_documents
+           where institution_id = $1 or institution_kind = $2
+           order by case when institution_id = $1 then 0 else 1 end, sort_order, title`,
+          [institution.id, institution.kind]
+        );
+        documents = documentRows.rows.map(normalizeDocumentRow);
+      }
+    } else if (supabaseConfig()) {
+      const institutionRows = await supabaseFetch("institution_guides", {}, `?id=eq.${encodeURIComponent(req.params.id)}&limit=1`).catch(() => []);
+      if (Array.isArray(institutionRows) && institutionRows[0]) {
+        institution = normalizeInstitutionRow(institutionRows[0]);
+        const documentRows = await supabaseFetch(
+          "institution_guide_documents",
+          {},
+          `?or=(institution_id.eq.${encodeURIComponent(institution.id)},institution_kind.eq.${encodeURIComponent(institution.kind)})&order=sort_order.asc,title.asc`
+        ).catch(() => []);
+        documents = Array.isArray(documentRows) ? documentRows.map(normalizeDocumentRow) : [];
+      }
+    }
+
+    if (!institution) {
+      const seed = getDefaultInstitutionGuideSeed();
+      institution = seed.institutions.find(item => item.id === req.params.id);
+      documents = seed.documents;
+    }
+
+    if (!institution) return res.status(404).json({ error: "institution_not_found" });
+
+    res.json(buildInstitutionChecklist({
+      institution,
+      documents,
+      diagnosticStatus,
+      checkedDocumentIds
+    }));
+  } catch (error: any) {
+    console.error("Institution checklist API error:", error?.message || error);
+    res.status(500).json({ error: "institution_checklist unavailable" });
   }
 });
 

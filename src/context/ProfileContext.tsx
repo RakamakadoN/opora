@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { DietRuleSummary, MedicationEventSummary } from '../lib/careTracker';
+import type { GovernmentQueueRecordSummary } from '../lib/governmentQueueMonitor';
 
 export type DiagnosticStatus = 
   | "Только подозреваем" 
@@ -189,6 +190,12 @@ export interface ReactionLog {
   note?: string;
 }
 
+export interface GovernmentQueueRecord extends GovernmentQueueRecordSummary {
+  appointmentAt?: string;
+  queueNumber?: number;
+  currentQueueNumber?: number;
+}
+
 export interface ProfileData {
   id: string;
   childName: string;
@@ -259,6 +266,7 @@ interface ProfileContextType {
   dietRules: DietRule[];
   foodLogs: FoodLog[];
   reactionLogs: ReactionLog[];
+  governmentQueueRecords: GovernmentQueueRecord[];
   addMedicationPlan: (plan: Omit<MedicationPlan, 'id' | 'childName' | 'active'>) => MedicationPlan;
   updateMedicationPlan: (id: string, plan: Partial<MedicationPlan>) => void;
   deleteMedicationPlan: (id: string) => void;
@@ -271,6 +279,9 @@ interface ProfileContextType {
   deleteFoodLog: (id: string) => void;
   addReactionLog: (log: Omit<ReactionLog, 'id' | 'childName'>) => ReactionLog;
   deleteReactionLog: (id: string) => void;
+  addGovernmentQueueRecord: (record: Omit<GovernmentQueueRecord, 'id' | 'childName' | 'status' | 'createdAt' | 'updatedAt'>) => GovernmentQueueRecord;
+  updateGovernmentQueueRecord: (id: string, record: Partial<GovernmentQueueRecord>) => void;
+  deleteGovernmentQueueRecord: (id: string) => void;
 }
 
 const DEFAULT_SENSORY_PASSPORT: SensoryPassportData = {
@@ -813,6 +824,18 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return [];
   });
 
+  const [governmentQueueRecords, setGovernmentQueueRecords] = useState<GovernmentQueueRecord[]>(() => {
+    const saved = localStorage.getItem('opora_government_queue_records');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [];
+  });
+
   const [remoteProfileStateLoaded, setRemoteProfileStateLoaded] = useState(false);
 
   useEffect(() => {
@@ -879,6 +902,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     localStorage.setItem('opora_reaction_logs', JSON.stringify(reactionLogs));
   }, [reactionLogs]);
+  useEffect(() => {
+    localStorage.setItem('opora_government_queue_records', JSON.stringify(governmentQueueRecords));
+  }, [governmentQueueRecords]);
 
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(() => {
     const saved = localStorage.getItem('opora_onboarding_completed');
@@ -916,6 +942,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setDietRules(Array.isArray(state.dietRules) ? state.dietRules : []);
           setFoodLogs(Array.isArray(state.foodLogs) ? state.foodLogs : []);
           setReactionLogs(Array.isArray(state.reactionLogs) ? state.reactionLogs : []);
+          setGovernmentQueueRecords(Array.isArray(state.governmentQueueRecords) ? state.governmentQueueRecords : []);
           setHasSeenOnboarding(Boolean(state.hasSeenOnboarding));
           if (state.appRole === 'doctor' || state.appRole === 'parent') setAppRoleState(state.appRole);
           if (state.theme === 'dark' || state.theme === 'light') setTheme(state.theme);
@@ -1554,6 +1581,34 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setReactionLogs(prev => prev.filter(item => item.id !== id));
   };
 
+  const addGovernmentQueueRecord = (
+    recordData: Omit<GovernmentQueueRecord, 'id' | 'childName' | 'status' | 'createdAt' | 'updatedAt'>
+  ) => {
+    const now = new Date().toISOString();
+    const record: GovernmentQueueRecord = {
+      ...recordData,
+      id: `queue-record-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childName: getChildName(recordData.childId),
+      status: 'waiting',
+      createdAt: now,
+      updatedAt: now
+    };
+    setGovernmentQueueRecords(prev => [record, ...prev]);
+    return record;
+  };
+
+  const updateGovernmentQueueRecord = (id: string, record: Partial<GovernmentQueueRecord>) => {
+    setGovernmentQueueRecords(prev => prev.map(item => item.id === id ? {
+      ...item,
+      ...record,
+      updatedAt: new Date().toISOString()
+    } : item));
+  };
+
+  const deleteGovernmentQueueRecord = (id: string) => {
+    setGovernmentQueueRecords(prev => prev.filter(item => item.id !== id));
+  };
+
   const completeOnboarding = () => {
     setHasSeenOnboarding(true);
     localStorage.setItem('opora_onboarding_completed', 'true');
@@ -1627,6 +1682,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       dietRules,
       foodLogs,
       reactionLogs,
+      governmentQueueRecords,
       addMedicationPlan,
       updateMedicationPlan,
       deleteMedicationPlan,
@@ -1638,7 +1694,10 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addFoodLog,
       deleteFoodLog,
       addReactionLog,
-      deleteReactionLog
+      deleteReactionLog,
+      addGovernmentQueueRecord,
+      updateGovernmentQueueRecord,
+      deleteGovernmentQueueRecord
     }}>
       {children}
     </ProfileContext.Provider>

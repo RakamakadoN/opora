@@ -4,6 +4,7 @@ import { cn } from '../lib/utils';
 import { useProfile } from '../context/ProfileContext';
 import { VERIFIED_DIRECTORY_ITEMS } from '../data/directory.generated';
 import { KZ_GOOGLE_PLACES_ITEMS } from '../data/kz-google-places.generated';
+import { InstitutionGuidePanel } from './InstitutionGuidePanel';
 
 interface Review {
   id: string;
@@ -518,6 +519,7 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
   const [filter, setFilter] = useState<DirectoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCity, setSelectedCity] = useState('Все города');
+  const activeProfile = profiles.find(p => p.id === activeProfileId) || profiles[0];
   const [recommendationName, setRecommendationName] = useState('');
   const [recommendationCity, setRecommendationCity] = useState('');
   const [recommendationKind, setRecommendationKind] = useState<DirectoryRecommendation['kind']>('dentistry');
@@ -1020,6 +1022,15 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
             </p>
           </div>
         </div>
+      )}
+
+      {(filter === 'gov' || filter === 'pmpk') && activeProfile && (
+        <InstitutionGuidePanel
+          childId={activeProfile.id}
+          city={selectedCity !== 'Все города' ? selectedCity : activeProfile.userCity || 'Алматы'}
+          diagnosticStatus={activeProfile.diagnosticStatus}
+          defaultKind={filter === 'pmpk' ? 'pmpk' : 'mse'}
+        />
       )}
 
       {/* Directory Cards Section */}
