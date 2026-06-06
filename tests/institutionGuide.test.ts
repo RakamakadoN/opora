@@ -22,6 +22,30 @@ test("institution seed includes disability-route agencies with district-scale me
   assert.equal(seed.institutions.every(item => item.regionCode && item.city), true);
 });
 
+test("institution seed uses concrete Almaty contacts instead of placeholder guidance", () => {
+  const seed = getDefaultInstitutionGuideSeed();
+  const almatyItems = seed.institutions.filter(item => item.city === "Алматы");
+
+  assert.equal(almatyItems.length >= 6, true);
+  assert.equal(almatyItems.some(item => item.kind === "pmpk" && /Тулебаева|Торайгырова/i.test(item.address || "")), true);
+  assert.equal(almatyItems.some(item => item.kind === "mse" && /Сейфуллина/i.test(item.address || "")), true);
+  assert.equal(almatyItems.some(item => item.kind === "social_protection" && /Достык/i.test(item.address || "")), true);
+  assert.equal(almatyItems.some(item => item.kind === "education_department" && /Республики/i.test(item.address || "")), true);
+  assert.equal(almatyItems.every(item => item.sourceUrl?.startsWith("https://")), true);
+  assert.equal(almatyItems.every(item => item.phone && !/уточнить/i.test(item.phone)), true);
+  assert.equal(almatyItems.every(item => item.address && !/уточняется|зависит|месту проживания/i.test(item.address)), true);
+});
+
+test("institution seed keeps verification metadata and source labels visible", () => {
+  const seed = getDefaultInstitutionGuideSeed();
+  const pmpk = seed.institutions.find(item => item.kind === "pmpk" && item.city === "Алматы");
+  assert.ok(pmpk);
+
+  assert.equal(pmpk.metadata.verificationStatus, "manual_public_source");
+  assert.equal(pmpk.metadata.recommendationStatus, "not_a_recommendation");
+  assert.match(pmpk.sourceLabel, /требует|публич/i);
+});
+
 test("document matcher returns place-specific documents before generic route documents", () => {
   const seed = getDefaultInstitutionGuideSeed();
   const mse = seed.institutions.find(item => item.kind === "mse");

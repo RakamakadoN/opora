@@ -183,8 +183,16 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
               <p className="mt-1 flex items-center gap-1 text-[11px] font-bold text-opora-sage">
                 <MapPin size={12} /> {institution.city}{institution.district ? ` · ${institution.district}` : ""}
               </p>
+              {institution.address && (
+                <p className="mt-1 text-[11px] font-semibold leading-snug text-opora-text/70 dark:text-slate-300">
+                  {institution.address}
+                </p>
+              )}
               <p className="mt-1 text-[10px] font-bold uppercase tracking-wider text-opora-text/50">
                 {kindLabels[institution.kind]}
+              </p>
+              <p className="mt-2 text-[10px] font-bold leading-snug text-opora-text/55 dark:text-slate-400">
+                {institution.sourceLabel}
               </p>
             </button>
           ))}
@@ -195,6 +203,12 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-extrabold text-opora-navy dark:text-white">{checklist.institution.name}</p>
+                {checklist.institution.address && (
+                  <p className="mt-1 flex items-start gap-1 text-[11px] font-semibold leading-snug text-opora-text/75 dark:text-slate-300">
+                    <MapPin size={12} className="mt-0.5 shrink-0 text-opora-sage" />
+                    <span>{checklist.institution.city}{checklist.institution.district ? ` · ${checklist.institution.district}` : ""} · {checklist.institution.address}</span>
+                  </p>
+                )}
                 <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-semibold text-opora-text/70 dark:text-slate-300">
                   {checklist.institution.phone && <span className="inline-flex items-center gap-1"><Phone size={12} />{checklist.institution.phone}</span>}
                   {checklist.institution.website && (
@@ -202,7 +216,16 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
                       сайт <ExternalLink size={12} />
                     </a>
                   )}
+                  {checklist.institution.sourceUrl && (
+                    <a href={checklist.institution.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-opora-sage">
+                      источник <ExternalLink size={12} />
+                    </a>
+                  )}
                 </div>
+                <p className="mt-2 rounded-lg bg-white/70 px-2 py-1 text-[10px] font-bold leading-snug text-opora-text/65 dark:bg-slate-800 dark:text-slate-300">
+                  {checklist.institution.sourceLabel}
+                  {checklist.institution.verifiedAt ? ` · проверено по публичным данным ${formatDate(checklist.institution.verifiedAt)}` : ""}
+                </p>
               </div>
               <div className="shrink-0 rounded-xl bg-white px-3 py-2 text-center shadow-sm dark:bg-slate-800">
                 <p className="text-base font-black text-opora-navy dark:text-white">{checklist.progress.percent}%</p>
@@ -285,4 +308,10 @@ function readChecked(childId: string, institutionId: string) {
 
 function writeChecked(childId: string, institutionId: string, ids: string[]) {
   localStorage.setItem(storageKey(childId, institutionId), JSON.stringify(ids));
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
+  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

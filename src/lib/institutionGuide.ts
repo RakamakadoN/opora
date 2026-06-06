@@ -1,4 +1,5 @@
 import type { DiagnosticStatus } from "../context/ProfileContext";
+import { KZ_INSTITUTION_GUIDE_ITEMS } from "../data/kz-google-places.generated";
 
 export type InstitutionKind =
   | "pmpk"
@@ -117,110 +118,12 @@ const STAGE_TITLES: Record<DisabilityRouteStage, string> = {
 export const INSTITUTION_GUIDE_DISCLAIMER =
   "Список помогает собрать документы заранее. Перед подачей уточните актуальные требования в выбранном учреждении, поликлинике, МСЭ, ЦОН/eGov или управлении по месту проживания.";
 
-const institutions: InstitutionGuide[] = [
-  {
-    id: "kz-almaty-pmpk-city",
-    name: "Городская ПМПК / КППК",
-    kind: "pmpk",
-    regionCode: "kz-ala",
-    city: "Алматы",
-    district: "Городской маршрут",
-    address: "Адрес уточняется по району проживания",
-    phone: "Контакт уточнить в управлении образования",
-    website: "https://www.gov.kz/",
-    sourceUrl: "https://www.gov.kz/",
-    sourceLabel: "gov.kz + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["ПМПК", "КППК", "образовательный маршрут", "документы"],
-    metadata: { appointment: "usually_by_queue", scale: "district" }
-  },
-  {
-    id: "kz-almaty-mse-district",
-    name: "Медико-социальная экспертиза по району",
-    kind: "mse",
-    regionCode: "kz-ala",
-    city: "Алматы",
-    district: "Районное бюро МСЭ",
-    address: "Адрес зависит от района прикрепления",
-    phone: "Уточнить через поликлинику или eGov",
-    website: "https://egov.kz/",
-    sourceUrl: "https://egov.kz/",
-    sourceLabel: "eGov / МСЭ + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["МСЭ", "инвалидность", "ИПАР", "ВКК"],
-    metadata: { appointment: "clinic_referral", scale: "district" }
-  },
-  {
-    id: "kz-almaty-social-protection",
-    name: "Управление занятости и социальных программ",
-    kind: "social_protection",
-    regionCode: "kz-ala",
-    city: "Алматы",
-    district: "Город / район",
-    address: "По месту регистрации семьи",
-    phone: "Контакт уточнить на gov.kz",
-    website: "https://www.gov.kz/",
-    sourceUrl: "https://www.gov.kz/",
-    sourceLabel: "gov.kz + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["соцзащита", "пособия", "услуги", "ИПАР"],
-    metadata: { afterMse: true, scale: "city" }
-  },
-  {
-    id: "kz-egov-csc",
-    name: "ЦОН / eGov",
-    kind: "egov_csc",
-    regionCode: "kz",
-    city: "Все города",
-    district: "Онлайн или ближайший ЦОН",
-    address: "egov.kz или ЦОН по месту проживания",
-    phone: "1414",
-    website: "https://egov.kz/",
-    sourceUrl: "https://egov.kz/",
-    sourceLabel: "eGov + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["ЦОН", "eGov", "заявления", "ЭЦП"],
-    metadata: { channel: "online_or_csc", scale: "national" }
-  },
-  {
-    id: "kz-almaty-education-department",
-    name: "Управление образования",
-    kind: "education_department",
-    regionCode: "kz-ala",
-    city: "Алматы",
-    district: "Город / район",
-    address: "Адрес уточняется на gov.kz",
-    phone: "Контакт уточнить на gov.kz",
-    website: "https://www.gov.kz/",
-    sourceUrl: "https://www.gov.kz/",
-    sourceLabel: "gov.kz + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["образование", "сад", "школа", "инклюзия", "ПМПК"],
-    metadata: { escalationRoute: true, scale: "city" }
-  },
-  {
-    id: "kz-clinic-vkk",
-    name: "Поликлиника / ВКК",
-    kind: "clinic_vkk",
-    regionCode: "kz",
-    city: "Все города",
-    district: "По месту прикрепления",
-    address: "Поликлиника ребенка",
-    phone: "Регистратура поликлиники",
-    website: "https://egov.kz/",
-    sourceUrl: "https://egov.kz/",
-    sourceLabel: "медицинская организация + источник о сборе документов",
-    verifiedAt: "2026-06-04T00:00:00.000Z",
-    serviceAreaPopulation: 1_000_000,
-    tags: ["ВКК", "поликлиника", "направление", "форма 088"],
-    metadata: { firstStep: true, scale: "clinic" }
-  }
-];
+const institutions: InstitutionGuide[] = KZ_INSTITUTION_GUIDE_ITEMS.map(item => ({
+  ...item,
+  kind: item.kind as InstitutionKind,
+  tags: [...item.tags],
+  metadata: { ...item.metadata }
+}));
 
 const documents: InstitutionGuideDocument[] = [
   doc("birth_certificate", "pmpk", "pmpk_route", "Свидетельство о рождении ребенка", "Оригинал и копия. Проверьте, чтобы ИИН читался без ошибок.", true, 10),
@@ -245,10 +148,10 @@ const documents: InstitutionGuideDocument[] = [
   doc("vkk_minutes", "clinic_vkk", "medical_preparation", "Решение ВКК / врачебной комиссии", "Попросите объяснить, какие формы и обследования нужны до направления на МСЭ.", true, 10),
   doc("test_results", "clinic_vkk", "medical_preparation", "Результаты обследований и анализов", "Собирайте только то, что назначил врач; сроки годности уточняйте в поликлинике.", false, 20)
 ].map(item => item.id.startsWith("mse_") || item.institutionKind === "mse"
-  ? { ...item, institutionId: item.institutionKind === "mse" ? "kz-almaty-mse-district" : item.institutionId }
+  ? { ...item, institutionId: item.institutionKind === "mse" ? "kz-almaty-mse-department" : item.institutionId }
   : item
 ).map(item => item.institutionKind === "pmpk"
-  ? { ...item, institutionId: "kz-almaty-pmpk-city" }
+  ? { ...item, institutionId: "kz-almaty-pmpk-medeu" }
   : item
 );
 
