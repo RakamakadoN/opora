@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine } from 'lucide-react';
+import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
@@ -41,6 +41,33 @@ const helperActions = [
   }
 ];
 
+const medicalNavigatorActions = [
+  {
+    label: 'Остановить прогрессию',
+    hint: 'врач, досье, фонды',
+    icon: Stethoscope,
+    prompt: 'Моя цель — найти врача, который оценит, можно ли замедлить или остановить прогрессию болезни у ребенка. Диагноз/подозрение: [укажите]. Город: [город]. Что ухудшается: [симптомы и сроки]. Какие документы есть: [перечислите]. Нужны: узкий специалист, перевод выписок, фонды и письма в клиники.'
+  },
+  {
+    label: 'Досье в клинику',
+    hint: 'список и письмо',
+    icon: Hospital,
+    prompt: 'Помоги собрать медицинское досье для зарубежной клиники. Диагноз: [укажите]. Страна/язык: [Германия/Израиль/США/другое]. Документы на руках: [перечислите]. Подготовь список недостающих документов, требования к переводу и письмо в клинику.'
+  },
+  {
+    label: 'Фонд на лечение',
+    hint: 'Казахстан и заявки',
+    icon: HandHeart,
+    prompt: 'Найди фонды в Казахстане, которые могут помочь оплатить диагностику, лечение, реабилитацию или поездку. Диагноз: [укажите]. Сумма/услуга: [укажите]. Город: [город]. Подготовь черновик обращения и список приложений.'
+  },
+  {
+    label: 'Перевод выписок',
+    hint: 'точно для врачей',
+    icon: Languages,
+    prompt: 'Помоги подготовить технический медицинский перевод выписок для клиники. Язык: [английский/немецкий/иврит]. Текст выписки: [вставьте]. Сохрани диагнозы, дозировки, даты, единицы измерения и названия обследований.'
+  }
+];
+
 const legalActions = [
   {
     label: 'Составить обращение',
@@ -71,7 +98,7 @@ export function AIAssistantTab() {
 
   // Initialize companion messages using the child's profile details
   useEffect(() => {
-    const welcomeText = `Я рядом. Для ${profile.childName || "ребенка"} (${profile.childAge} лет) сейчас этап: «${profile.diagnosticStatus}».\n\nМогу простыми словами объяснить термины, подсказать первые шаги в Казахстане или помочь спокойно разложить тревожную ситуацию.`;
+    const welcomeText = `Я рядом. Для ${profile.childName || "ребенка"} (${profile.childAge} лет) сейчас этап: «${profile.diagnosticStatus}».\n\nМогу простыми словами объяснить термины, подсказать первые шаги в Казахстане, помочь найти врача, собрать документы, подготовить перевод, письма в клиники и обращения в фонды.`;
     
     setMessages([
       {
@@ -205,6 +232,43 @@ export function AIAssistantTab() {
 
         <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">
           <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-opora-sage text-white">
+              <Stethoscope size={16} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                Медицинский навигатор до Точки Б
+              </p>
+              <p className="text-xs font-bold leading-snug text-opora-navy">
+                Врач, досье, перевод, фонды и письма
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2">
+            {medicalNavigatorActions.map(action => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => setInputValue(action.prompt)}
+                  className="flex min-h-[58px] items-center gap-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.98]"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-opora-peach/35 text-opora-navy">
+                    <Icon size={17} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-extrabold leading-tight text-opora-navy">{action.label}</span>
+                    <span className="block text-[11px] font-medium leading-snug text-opora-text/70">{action.hint}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">
+          <div className="mb-3 flex items-center gap-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-opora-navy text-white">
               <Scale size={16} />
             </div>
@@ -300,7 +364,7 @@ export function AIAssistantTab() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Спросите о терминах, правах в РК или поделитесь..."
+            placeholder="Спросите о медицинском маршруте, правах в РК или поделитесь..."
             className="opora-ai-input w-full bg-white border border-black/5 rounded-2xl py-3.5 pl-4 pr-12 text-[13px] font-medium focus:outline-none focus:ring-4 focus:ring-opora-sage/10 focus:border-opora-sage resize-none text-opora-navy placeholder:text-opora-text/40 shadow-sm transition-all"
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
