@@ -2515,7 +2515,7 @@ export function NavigatorTab({
             <p className="text-sm text-opora-text/80 mb-4 leading-relaxed tracking-tight">Отмечайте завершённые сессии, чтобы видеть регулярность.</p>
             
             <div className="bg-opora-sand/30 border border-black/[0.04] p-4 rounded-xl overflow-x-auto no-scrollbar">
-             <div className="min-w-[320px]">
+             <div className="min-w-0">
                 <div className="flex w-full justify-between items-end mb-2">
                    <div className="w-16"></div> {/* Offset for labels */}
                    {generateLastWeek().map((d, i) => (

@@ -77,10 +77,11 @@ function AppContent() {
   };
 
   return (
-    <div className="flex min-h-screen justify-center items-center p-0 sm:p-4">
-      <div className="opora-device-frame opora-shell w-full h-[100dvh] sm:h-[844px] max-w-[390px] sm:max-w-[410px] sm:rounded-[2rem] overflow-hidden relative flex flex-col font-sans sm:border border-white/70">
-        <main className="flex-1 overflow-y-auto pb-4 scroll-smooth relative z-10">
-          <div className="absolute right-4 top-3 z-30 rounded-2xl border border-black/5 bg-white/80 p-1 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
+    <div className="flex min-h-screen items-center justify-center p-0 sm:p-4">
+      <div className="opora-device-frame opora-shell opora-mobile-shell relative flex w-full max-w-none flex-col overflow-hidden font-sans sm:h-[844px] sm:max-w-[410px] sm:rounded-[2rem] sm:border sm:border-white/70">
+        <main className="opora-shell-main relative z-10 min-w-0 flex-1 overflow-y-auto scroll-smooth">
+          <div className="opora-role-switcher flex justify-end px-4 pt-3">
+            <div className="flex max-w-full flex-wrap justify-end gap-1 rounded-2xl border border-black/5 bg-white/80 p-1 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
             {[
               { id: 'parent', label: 'Я родитель' },
               { id: 'doctor', label: 'Я врач' }
@@ -93,13 +94,14 @@ function AppContent() {
                   setAppRole(nextRole);
                   setActiveTab(nextRole === 'doctor' ? 'doctor' : 'navigator');
                 }}
-                className={`rounded-xl px-2.5 py-1.5 text-[10px] font-extrabold transition-all ${
+                className={`min-h-8 flex-1 rounded-xl px-2.5 py-1.5 text-[10px] font-extrabold transition-all sm:flex-none ${
                   appRole === role.id ? 'bg-opora-navy text-white' : 'text-opora-navy dark:text-slate-100'
                 }`}
               >
                 {role.label}
               </button>
             ))}
+            </div>
           </div>
           <AnimatePresence mode="wait">
             <motion.div
@@ -108,15 +110,15 @@ function AppContent() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="h-full"
+              className="min-h-full min-w-0"
             >
               {renderTab()}
             </motion.div>
           </AnimatePresence>
         </main>
 
-        <nav className="opora-bottom-nav w-full shrink-0 backdrop-blur-2xl border-t px-3 pb-7 pt-3 z-50">
-          <ul className="flex justify-between items-center px-2">
+        <nav className="opora-bottom-nav no-scrollbar z-50 w-full shrink-0 overflow-x-auto border-t px-3 pb-7 pt-3 backdrop-blur-2xl">
+          <ul className="flex min-w-max items-center justify-start gap-2 px-1">
             {appRole === 'parent' && (
               <>
                 <NavItem 
@@ -209,10 +211,11 @@ function AuthenticatedApp() {
 
 function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
   return (
-    <button 
+    <button
+      type="button"
       onClick={onClick}
       aria-current={isActive ? 'page' : undefined}
-      className={`opora-nav-button flex flex-col items-center gap-1 transition-all duration-200 active:scale-95 ${isActive ? 'text-opora-sage' : 'text-opora-text hover:text-opora-navy'}`}
+      className={`opora-nav-button flex shrink-0 flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 ${isActive ? 'text-opora-sage' : 'text-opora-text hover:text-opora-navy'}`}
     >
       <div className={`opora-nav-icon relative flex items-center justify-center p-2 transition-all duration-200 ${isActive ? 'bg-opora-sage/10 text-opora-sage' : 'text-opora-text/70'}`}>
         {icon}

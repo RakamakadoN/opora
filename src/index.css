@@ -46,13 +46,17 @@
 }
 
 html {
+  width: 100%;
   min-height: 100%;
+  overflow-x: hidden;
   background: var(--opora-sand);
 }
 
 body {
+  width: 100%;
   min-height: 100%;
   margin: 0;
+  overflow-x: hidden;
   background: linear-gradient(180deg, #FFFFFF 0%, #F4F8F7 55%, #E9F1EF 100%);
   color: var(--color-opora-text);
   font-feature-settings: "liga" 1, "kern" 1;
@@ -69,6 +73,30 @@ select {
 
 button {
   -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+span,
+label,
+button,
+a,
+li,
+input,
+textarea,
+select {
+  overflow-wrap: anywhere;
 }
 
 button:focus-visible,
@@ -103,6 +131,40 @@ main::-webkit-scrollbar,
   background: linear-gradient(180deg, #FFFFFF 0%, #F6FAF9 52%, #EFF6F4 100%);
 }
 
+.opora-mobile-shell {
+  height: 100dvh;
+  min-width: 0;
+}
+
+.opora-shell,
+.opora-shell > *,
+.opora-shell main,
+.opora-shell section,
+.opora-shell article,
+.opora-shell form,
+.opora-shell header,
+.opora-shell footer {
+  min-width: 0;
+}
+
+.opora-shell-main {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+.opora-role-switcher {
+  padding-top: max(0.75rem, env(safe-area-inset-top)) !important;
+  padding-right: max(1rem, env(safe-area-inset-right)) !important;
+  padding-left: max(1rem, env(safe-area-inset-left)) !important;
+}
+
+.opora-auth-scroll,
+.opora-onboarding-scroll {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+  padding-right: max(1.25rem, env(safe-area-inset-right));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  padding-left: max(1.25rem, env(safe-area-inset-left));
+}
+
 .dark .opora-shell {
   background: linear-gradient(180deg, #17232C 0%, #101820 100%);
 }
@@ -124,6 +186,9 @@ main::-webkit-scrollbar,
   background: rgba(255, 255, 255, 0.95) !important;
   border-color: var(--opora-line) !important;
   box-shadow: 0 -12px 30px rgba(18, 48, 58, 0.08) !important;
+  padding-right: max(0.75rem, env(safe-area-inset-right)) !important;
+  padding-bottom: max(0.85rem, env(safe-area-inset-bottom)) !important;
+  padding-left: max(0.75rem, env(safe-area-inset-left)) !important;
 }
 
 .dark .opora-bottom-nav {
@@ -133,8 +198,15 @@ main::-webkit-scrollbar,
 }
 
 .opora-nav-button {
-  min-width: 58px;
+  min-width: 56px;
+  min-height: 52px;
   border-radius: 8px;
+}
+
+.opora-nav-button span {
+  max-width: 4.6rem;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .opora-nav-button[aria-current="page"] {
@@ -148,6 +220,12 @@ main::-webkit-scrollbar,
 .opora-nav-button[aria-current="page"] .opora-nav-icon {
   background: rgba(0, 124, 112, 0.11) !important;
   box-shadow: inset 0 0 0 1px rgba(0, 124, 112, 0.14);
+}
+
+@media (max-width: 360px) {
+  .opora-role-switcher > div {
+    width: 100%;
+  }
 }
 
 .opora-community-card {

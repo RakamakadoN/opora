@@ -21,21 +21,22 @@ export function AuthScreen() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-0 sm:p-4">
-      <div className="opora-device-frame opora-shell flex h-[100dvh] w-full max-w-[410px] flex-col justify-between overflow-hidden p-6 font-sans sm:h-[844px] sm:rounded-[2rem] sm:border sm:border-white/70">
-        <div className="pt-10">
+      <div className="opora-device-frame opora-shell opora-mobile-shell flex w-full max-w-none flex-col overflow-hidden font-sans sm:h-[844px] sm:max-w-[410px] sm:rounded-[2rem] sm:border sm:border-white/70">
+        <div className="opora-auth-scroll flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6 sm:px-6">
+          <div className="pt-4 sm:pt-10">
           <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-opora-sage/12 text-opora-sage">
             <HeartHandshake size={28} />
           </div>
           <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">Аккаунт Опоры</p>
-          <h1 className="mt-2 font-serif text-[34px] font-semibold leading-tight text-opora-navy">
+          <h1 className="mt-2 font-serif text-[30px] font-semibold leading-tight text-opora-navy sm:text-[34px]">
             {mode === 'register' ? 'Создадим ваш личный кабинет' : 'С возвращением'}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-opora-text">
             Данные ребенка, дневник, прогресс и доступы врачей будут привязаны к вашему аккаунту.
           </p>
-        </div>
+          </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="mt-6 min-w-0 space-y-4">
           <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/70 p-1 shadow-sm">
             {[
               { id: 'register', label: 'Регистрация' },
@@ -48,7 +49,7 @@ export function AuthScreen() {
                   clearError();
                   setMode(item.id as typeof mode);
                 }}
-                className={`rounded-xl px-3 py-2.5 text-sm font-extrabold transition-all ${
+                className={`min-h-11 rounded-xl px-3 py-2.5 text-sm font-extrabold transition-all ${
                   mode === item.id ? 'bg-opora-navy text-white' : 'text-opora-navy'
                 }`}
               >
@@ -81,7 +82,7 @@ export function AuthScreen() {
                       key={item.id}
                       type="button"
                       onClick={() => setRole(item.id as typeof role)}
-                      className={`rounded-2xl border px-4 py-3 text-sm font-extrabold ${
+                      className={`min-h-11 rounded-2xl border px-4 py-3 text-sm font-extrabold ${
                         role === item.id
                           ? 'border-opora-sage bg-opora-sage text-white'
                           : 'border-black/5 bg-white text-opora-navy'
@@ -135,7 +136,7 @@ export function AuthScreen() {
           <button
             type="submit"
             disabled={isLoading || !email.trim() || password.length < 8}
-            className="w-full rounded-2xl bg-opora-navy px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-opora-navy/15 transition-all active:scale-[0.99] disabled:opacity-50"
+            className="min-h-12 w-full rounded-2xl bg-opora-navy px-5 py-4 text-base font-extrabold text-white shadow-lg shadow-opora-navy/15 transition-all active:scale-[0.99] disabled:opacity-50"
           >
             {isLoading
               ? 'Подождите...'
@@ -145,9 +146,10 @@ export function AuthScreen() {
           </button>
         </form>
 
-        <p className="pb-3 text-center text-[11px] leading-relaxed text-opora-text">
+        <p className="mt-5 pb-3 text-center text-[11px] leading-relaxed text-opora-text">
           Опора не ставит диагноз и не заменяет консультацию специалиста.
         </p>
+        </div>
       </div>
     </div>
   );
