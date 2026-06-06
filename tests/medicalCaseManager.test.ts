@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildDefaultMedicalCaseTracker,
   buildMedicalCaseRoute,
+  calculateMedicalCaseProgress,
   getMedicalFoundationResources,
-  getMedicalLetterTemplates
+  getMedicalLetterTemplates,
+  getNextMedicalCaseAction
 } from "../src/lib/medicalCaseManager";
 
 test("medical route includes treating physician documents and current extracts", () => {
@@ -66,4 +69,28 @@ test("chat fallback returns case-management route for progression goal", async (
   assert.match(reply, /перевод/i);
   assert.match(reply, /фонд/i);
   assert.match(reply, /клиник/i);
+});
+
+test("medical case tracker calculates visible progress and next action", () => {
+  const route = buildMedicalCaseRoute({
+    childName: "Алия",
+    childAge: 7,
+    userCity: "Алматы"
+  }, "найти врача который оценит прогрессию");
+  const tracker = buildDefaultMedicalCaseTracker(route, "child-1");
+  const updated = {
+    ...tracker,
+    items: tracker.items.map(item => item.id === "stabilize"
+      ? { ...item, status: "done" as const, completedAt: "2026-06-07T00:00:00.000Z" }
+      : item)
+  };
+
+  const progress = calculateMedicalCaseProgress(updated);
+  const next = getNextMedicalCaseAction(updated);
+
+  assert.equal(progress.doneCount, 1);
+  assert.equal(progress.totalCount, route.steps.length);
+  assert.equal(progress.percent, Math.round(100 / route.steps.length));
+  assert.equal(next?.id, "doctor_extracts");
+  assert.match(next?.action || "", /врач/i);
 });

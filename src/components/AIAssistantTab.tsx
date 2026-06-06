@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital } from 'lucide-react';
+import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital, CheckCircle2, Circle, Clock3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
+import {
+  buildDefaultMedicalCaseTracker,
+  buildMedicalCaseRoute,
+  calculateMedicalCaseProgress,
+  getNextMedicalCaseAction,
+  type MedicalCaseItemStatus,
+  type MedicalCaseTracker
+} from '../lib/medicalCaseManager';
 
 type Message = {
   id: string;
@@ -94,6 +102,7 @@ export function AIAssistantTab() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [medicalCaseTracker, setMedicalCaseTracker] = useState<MedicalCaseTracker | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   // Initialize companion messages using the child's profile details
@@ -112,6 +121,44 @@ export function AIAssistantTab() {
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(`opora_medical_case_tracker_${profile.id}`);
+    setMedicalCaseTracker(saved ? JSON.parse(saved) : null);
+  }, [profile.id]);
+
+  useEffect(() => {
+    if (!medicalCaseTracker) return;
+    localStorage.setItem(`opora_medical_case_tracker_${profile.id}`, JSON.stringify(medicalCaseTracker));
+  }, [medicalCaseTracker, profile.id]);
+
+  const startMedicalCaseTracker = () => {
+    const route = buildMedicalCaseRoute(profile, 'найти врача который оценит прогрессию');
+    const tracker = buildDefaultMedicalCaseTracker(route, profile.id);
+    setMedicalCaseTracker(tracker);
+    setInputValue(medicalNavigatorActions[0].prompt);
+  };
+
+  const updateMedicalCaseItemStatus = (id: string, status: MedicalCaseItemStatus) => {
+    setMedicalCaseTracker(prev => {
+      if (!prev) return prev;
+      const now = new Date().toISOString();
+      return {
+        ...prev,
+        updatedAt: now,
+        items: prev.items.map(item => item.id === id
+          ? {
+              ...item,
+              status,
+              completedAt: status === 'done' ? now : undefined
+            }
+          : item)
+      };
+    });
+  };
+
+  const medicalCaseProgress = medicalCaseTracker ? calculateMedicalCaseProgress(medicalCaseTracker) : null;
+  const nextMedicalCaseAction = medicalCaseTracker ? getNextMedicalCaseAction(medicalCaseTracker) : null;
 
   const handleSend = async () => {
     if (isTyping || !inputValue.trim()) return;
@@ -265,6 +312,110 @@ export function AIAssistantTab() {
               );
             })}
           </div>
+        </div>
+
+        <div className="opora-ai-intro rounded-2xl border border-opora-peach/50 bg-white/80 px-4 py-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                Трекер медицинского кейса
+              </p>
+              <p className="text-sm font-extrabold leading-snug text-opora-navy">
+                {medicalCaseTracker ? medicalCaseTracker.title : 'Дойти до Точки Б по шагам'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={startMedicalCaseTracker}
+              className="shrink-0 rounded-xl bg-opora-navy px-3 py-2 text-[11px] font-extrabold text-white shadow-sm active:scale-[0.98]"
+            >
+              {medicalCaseTracker ? 'Обновить' : 'Создать'}
+            </button>
+          </div>
+
+          {medicalCaseTracker && medicalCaseProgress ? (
+            <div className="space-y-3">
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-opora-text/70">
+                  <span>{medicalCaseProgress.doneCount} из {medicalCaseProgress.totalCount} шагов готово</span>
+                  <span>{medicalCaseProgress.percent}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-opora-sand">
+                  <div
+                    className="h-full rounded-full bg-opora-sage transition-all"
+                    style={{ width: `${medicalCaseProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+
+              {nextMedicalCaseAction && (
+                <div className="rounded-xl border border-opora-sage/20 bg-opora-sage/10 px-3 py-2.5">
+                  <div className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                    <Clock3 size={13} />
+                    Следующее действие
+                  </div>
+                  <p className="text-sm font-bold leading-snug text-opora-navy">{nextMedicalCaseAction.title}</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-opora-text/80">
+                    {nextMedicalCaseAction.deadline}: {nextMedicalCaseAction.action}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {medicalCaseTracker.items.map(item => (
+                  <div key={item.id} className="rounded-xl border border-black/5 bg-white px-3 py-2.5">
+                    <div className="flex items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateMedicalCaseItemStatus(item.id, item.status === 'done' ? 'todo' : 'done')}
+                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-opora-sand text-opora-sage"
+                        aria-label={item.status === 'done' ? 'Отметить шаг как не готовый' : 'Отметить шаг готовым'}
+                      >
+                        {item.status === 'done' ? <CheckCircle2 size={17} /> : <Circle size={17} />}
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <p className="text-sm font-extrabold leading-tight text-opora-navy">{item.title}</p>
+                          <span className="rounded-full bg-opora-sand px-2 py-0.5 text-[10px] font-extrabold text-opora-text/70">
+                            {item.deadline}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs font-medium leading-relaxed text-opora-text/75">{item.output}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {([
+                            ['todo', 'не начато'],
+                            ['requested', 'запрошено'],
+                            ['sent', 'отправлено'],
+                            ['waiting', 'ждем ответ'],
+                            ['done', 'готово']
+                          ] as Array<[MedicalCaseItemStatus, string]>).map(([status, label]) => (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => updateMedicalCaseItemStatus(item.id, status)}
+                              className={`rounded-full px-2 py-1 text-[10px] font-extrabold transition-all ${
+                                item.status === status
+                                  ? 'bg-opora-navy text-white'
+                                  : 'bg-opora-sand text-opora-text/70'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl bg-opora-sand/70 px-3 py-3">
+              <p className="text-sm font-bold leading-snug text-opora-navy">
+                Создайте кейс, и здесь появится прогресс: документы, перевод, фонды, клиники и следующий шаг.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">

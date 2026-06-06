@@ -48,6 +48,28 @@ export type MedicalCaseRoute = {
   safetyNote: string;
 };
 
+export type MedicalCaseItemStatus = "todo" | "requested" | "sent" | "waiting" | "done";
+
+export type MedicalCaseTrackerItem = MedicalRouteStep & {
+  status: MedicalCaseItemStatus;
+  completedAt?: string;
+};
+
+export type MedicalCaseTracker = {
+  id: string;
+  childId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  items: MedicalCaseTrackerItem[];
+};
+
+export type MedicalCaseProgress = {
+  doneCount: number;
+  totalCount: number;
+  percent: number;
+};
+
 const VERIFIED_AT = "2026-06-06";
 
 const documentRequirements: MedicalDocumentRequirement[] = [
@@ -320,6 +342,38 @@ export function buildMedicalCaseRoute(profile: MedicalCaseProfile = {}, _userGoa
     ],
     safetyNote: "Цель маршрута - найти специалиста и собрать данные для медицинского решения. Назначения, отмена препаратов, госпитализация и срочные решения только через врача. При угрозе жизни, судорогах, дыхательных нарушениях, резком ухудшении, обезвоживании, потере сознания или тяжелой боли обращайтесь в экстренную службу."
   };
+}
+
+export function buildDefaultMedicalCaseTracker(
+  route: MedicalCaseRoute,
+  childId: string,
+  now = new Date().toISOString()
+): MedicalCaseTracker {
+  return {
+    id: `medical-case-${childId}`,
+    childId,
+    title: route.title,
+    createdAt: now,
+    updatedAt: now,
+    items: route.steps.map(item => ({
+      ...item,
+      status: "todo"
+    }))
+  };
+}
+
+export function calculateMedicalCaseProgress(tracker: MedicalCaseTracker): MedicalCaseProgress {
+  const totalCount = tracker.items.length;
+  const doneCount = tracker.items.filter(item => item.status === "done").length;
+  return {
+    doneCount,
+    totalCount,
+    percent: totalCount === 0 ? 0 : Math.round((doneCount / totalCount) * 100)
+  };
+}
+
+export function getNextMedicalCaseAction(tracker: MedicalCaseTracker): MedicalCaseTrackerItem | undefined {
+  return tracker.items.find(item => item.status !== "done");
 }
 
 export function isMedicalCaseManagerQuery(query: string): boolean {
