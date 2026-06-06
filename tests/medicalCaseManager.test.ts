@@ -50,3 +50,20 @@ test("clinic and foundation templates include required copy-ready sections", () 
   assert.match(foundation.bodyRu, /финансирован/i);
   assert.match(foundation.bodyRu, /контакт/i);
 });
+
+test("chat fallback returns case-management route for progression goal", async () => {
+  process.env.NODE_ENV = "test";
+  const { getFallbackChatResponse } = await import("../server");
+
+  const reply = getFallbackChatResponse("Моя цель найти врача который остановит прогрессию болезни у дочери", {
+    childName: "Алия",
+    childAge: 7,
+    userCity: "Алматы"
+  });
+
+  assert.match(reply, /24-48/);
+  assert.match(reply, /лечащ(ий|его) врач/i);
+  assert.match(reply, /перевод/i);
+  assert.match(reply, /фонд/i);
+  assert.match(reply, /клиник/i);
+});
