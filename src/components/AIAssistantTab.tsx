@@ -104,6 +104,7 @@ export function AIAssistantTab() {
   const [isTyping, setIsTyping] = useState(false);
   const [medicalCaseTracker, setMedicalCaseTracker] = useState<MedicalCaseTracker | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Initialize companion messages using the child's profile details
   useEffect(() => {
@@ -121,6 +122,13 @@ export function AIAssistantTab() {
   useEffect(() => {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+  }, [inputValue]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`opora_medical_case_tracker_${profile.id}`);
@@ -228,7 +236,7 @@ export function AIAssistantTab() {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-4 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-28 space-y-5">
         <div className="opora-ai-intro rounded-2xl border border-black/5 px-4 py-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-2xl bg-opora-sage/10 text-opora-sage flex items-center justify-center shrink-0">
@@ -512,18 +520,19 @@ export function AIAssistantTab() {
       <div className="opora-ai-inputbar px-4 py-3 bg-white/80 backdrop-blur-xl border-t border-black/5 pb-8 relative z-20">
         <div className="flex relative items-end group shadow-sm rounded-2xl">
           <textarea
+            ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Спросите о медицинском маршруте, правах в РК или поделитесь..."
-            className="opora-ai-input w-full bg-white border border-black/5 rounded-2xl py-3.5 pl-4 pr-12 text-[13px] font-medium focus:outline-none focus:ring-4 focus:ring-opora-sage/10 focus:border-opora-sage resize-none text-opora-navy placeholder:text-opora-text/40 shadow-sm transition-all"
-            rows={1}
-            style={{ minHeight: '48px', maxHeight: '120px' }}
+            className="opora-ai-input w-full bg-white border border-black/5 rounded-2xl py-3.5 pl-4 pr-14 text-[13px] font-medium leading-relaxed focus:outline-none focus:ring-4 focus:ring-opora-sage/10 focus:border-opora-sage resize-none overflow-y-auto text-opora-navy placeholder:text-opora-text/40 shadow-sm transition-all"
+            rows={2}
+            style={{ minHeight: '64px', maxHeight: '180px' }}
           />
           <button 
             onClick={handleSend}
             disabled={!inputValue.trim() || isTyping}
-            className="absolute right-2 bottom-1.5 p-2 bg-opora-navy text-white rounded-2xl disabled:opacity-50 disabled:bg-gray-300 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-md shadow-opora-navy/10"
+            className="absolute right-2 bottom-2 p-2.5 bg-opora-navy text-white rounded-2xl disabled:opacity-50 disabled:bg-gray-300 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-md shadow-opora-navy/10"
           >
             <Send size={15} />
           </button>
