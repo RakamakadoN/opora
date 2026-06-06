@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   BellRing,
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -27,6 +28,13 @@ import {
   sortMedicationEventsForDay
 } from '../lib/careTracker';
 import {
+  buildFamilyCalendarEventsFromSources,
+  expandFamilyEventOccurrences,
+  getChildColorToken,
+  type FamilyCalendarOccurrence,
+  type FamilyEventSource
+} from '../lib/familyCalendar';
+import {
   buildMapsRouteUrl,
   getGovernmentQueueReminder,
   getGovernmentQueueStatus,
@@ -34,7 +42,8 @@ import {
   type GovernmentQueueStatus
 } from '../lib/governmentQueueMonitor';
 
-type TrackerView = 'day' | 'meds' | 'food' | 'queues' | 'report';
+type TrackerView = 'calendar' | 'day' | 'meds' | 'food' | 'queues' | 'report';
+type CalendarChildFilter = 'all' | string;
 
 const todayDate = () => new Date().toISOString().slice(0, 10);
 const nowLocalInput = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -47,10 +56,31 @@ const ruleTypeLabels: Record<DietRule['type'], string> = {
   other: 'Другое'
 };
 
+const eventSourceLabels: Record<FamilyEventSource, string> = {
+  manual: 'Вручную',
+  medication_plan: 'Лекарство',
+  medical_booking: 'Врач',
+  government_queue: 'Госочередь',
+  parent_task: 'Задача'
+};
+
+const childColorClasses: Record<string, { dot: string; badge: string; line: string; marker: string }> = {
+  rose: { dot: 'bg-rose-500', badge: 'bg-rose-50 text-rose-700 border-rose-100', line: 'border-l-rose-400', marker: 'bg-rose-400' },
+  amber: { dot: 'bg-amber-500', badge: 'bg-amber-50 text-amber-800 border-amber-100', line: 'border-l-amber-400', marker: 'bg-amber-400' },
+  emerald: { dot: 'bg-emerald-500', badge: 'bg-emerald-50 text-emerald-700 border-emerald-100', line: 'border-l-emerald-400', marker: 'bg-emerald-400' },
+  sky: { dot: 'bg-sky-500', badge: 'bg-sky-50 text-sky-700 border-sky-100', line: 'border-l-sky-400', marker: 'bg-sky-400' },
+  violet: { dot: 'bg-violet-500', badge: 'bg-violet-50 text-violet-700 border-violet-100', line: 'border-l-violet-400', marker: 'bg-violet-400' },
+  teal: { dot: 'bg-teal-500', badge: 'bg-teal-50 text-teal-700 border-teal-100', line: 'border-l-teal-400', marker: 'bg-teal-400' },
+  pink: { dot: 'bg-pink-500', badge: 'bg-pink-50 text-pink-700 border-pink-100', line: 'border-l-pink-400', marker: 'bg-pink-400' },
+  indigo: { dot: 'bg-indigo-500', badge: 'bg-indigo-50 text-indigo-700 border-indigo-100', line: 'border-l-indigo-400', marker: 'bg-indigo-400' }
+};
+
 export function CareTrackerTab() {
   const {
     profile,
     profiles,
+    medicalBookings,
+    parentTasks,
     medicationPlans,
     medicationEvents,
     dietRules,
@@ -72,8 +102,10 @@ export function CareTrackerTab() {
     deleteGovernmentQueueRecord
   } = useProfile();
 
-  const [view, setView] = React.useState<TrackerView>('day');
+  const [view, setView] = React.useState<TrackerView>('calendar');
   const [selectedChildId, setSelectedChildId] = React.useState(profile.id);
+  const [calendarChildFilter, setCalendarChildFilter] = React.useState<CalendarChildFilter>('all');
+  const [selectedCalendarDate, setSelectedCalendarDate] = React.useState(todayDate());
   const [planName, setPlanName] = React.useState('');
   const [doseText, setDoseText] = React.useState('');
   const [scheduleTime, setScheduleTime] = React.useState('09:00');
@@ -111,6 +143,34 @@ export function CareTrackerTab() {
     governmentQueueRecords.filter(record => record.childId === selectedChildId),
     new Date()
   );
+  const childNamesById = new Map(profiles.map(child => [child.id, child.childName]));
+  const calendarDays = getCalendarWindow(todayDate());
+  const calendarRangeStart = `${calendarDays[0]}T00:00:00.000Z`;
+  const calendarRangeEnd = `${addDays(calendarDays[calendarDays.length - 1], 1)}T00:00:00.000Z`;
+  const familySchedule = React.useMemo(() => {
+    const familyEvents = buildFamilyCalendarEventsFromSources({
+      familyId: 'local-family',
+      createdByUserId: 'local-parent',
+      now: new Date().toISOString(),
+      medicationPlans,
+      medicalBookings,
+      governmentQueueRecords,
+      parentTasks
+    });
+
+    return expandFamilyEventOccurrences({
+      events: familyEvents.events,
+      recurrenceRules: familyEvents.recurrenceRules,
+      exceptions: [],
+      occurrenceStates: [],
+      rangeStart: calendarRangeStart,
+      rangeEnd: calendarRangeEnd
+    });
+  }, [calendarRangeEnd, calendarRangeStart, governmentQueueRecords, medicalBookings, medicationPlans, parentTasks]);
+  const visibleSchedule = familySchedule.filter(occurrence =>
+    calendarChildFilter === 'all' || occurrence.childIds.includes(calendarChildFilter)
+  );
+  const selectedDaySchedule = visibleSchedule.filter(occurrence => occurrence.occurrenceDate === selectedCalendarDate);
 
   React.useEffect(() => {
     const refreshQueueStatuses = () => {
@@ -303,8 +363,9 @@ export function CareTrackerTab() {
           ))}
         </div>
 
-        <div className="mb-5 grid grid-cols-5 gap-1 rounded-2xl bg-white/80 p-1 shadow-sm">
+        <div className="mb-5 grid grid-cols-3 gap-1 rounded-2xl bg-white/80 p-1 shadow-sm">
           {[
+            { id: 'calendar', label: 'Семья', icon: CalendarDays },
             { id: 'day', label: 'День', icon: Clock },
             { id: 'meds', label: 'Лек.', icon: BellRing },
             { id: 'food', label: 'Еда', icon: Salad },
@@ -330,6 +391,78 @@ export function CareTrackerTab() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 pb-6">
+        {view === 'calendar' && (
+          <section className="space-y-4">
+            <Panel title="Общее расписание" icon={<CalendarDays size={18} />}>
+              <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+                <button
+                  type="button"
+                  onClick={() => setCalendarChildFilter('all')}
+                  className={`shrink-0 rounded-2xl px-4 py-2 text-xs font-extrabold transition-all ${
+                    calendarChildFilter === 'all' ? 'bg-opora-navy text-white shadow-sm' : 'bg-opora-sand text-opora-navy'
+                  }`}
+                >
+                  Все дети
+                </button>
+                {profiles.map(child => {
+                  const color = getChildColorClasses(child.id);
+                  return (
+                    <button
+                      key={child.id}
+                      type="button"
+                      onClick={() => setCalendarChildFilter(child.id)}
+                      className={`flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-xs font-extrabold transition-all ${
+                        calendarChildFilter === child.id ? 'bg-opora-navy text-white shadow-sm' : 'bg-opora-sand text-opora-navy'
+                      }`}
+                    >
+                      <span className={`h-2.5 w-2.5 rounded-full ${color.dot}`} />
+                      {child.childName}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map(day => {
+                  const dayItems = visibleSchedule.filter(occurrence => occurrence.occurrenceDate === day);
+                  const isSelected = selectedCalendarDate === day;
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => setSelectedCalendarDate(day)}
+                      className={`min-h-[72px] rounded-xl border px-1.5 py-2 text-center transition-all ${
+                        isSelected ? 'border-opora-sage bg-opora-sage text-white' : 'border-opora-sage/10 bg-white text-opora-navy'
+                      }`}
+                    >
+                      <span className="block text-[9px] font-extrabold uppercase opacity-70">{formatWeekday(day)}</span>
+                      <span className="mt-1 block text-sm font-extrabold">{new Date(`${day}T00:00:00.000Z`).getUTCDate()}</span>
+                      <span className="mt-2 flex min-h-2 items-center justify-center gap-0.5">
+                        {dayItems.slice(0, 3).map(item => {
+                          const color = getChildColorClasses(item.childIds[0] || 'family');
+                          return <span key={item.occurrenceId} className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : color.marker}`} />;
+                        })}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </Panel>
+
+            <Panel title={formatAgendaTitle(selectedCalendarDate)} icon={<Clock size={18} />}>
+              {selectedDaySchedule.length ? (
+                <div className="space-y-3">
+                  {selectedDaySchedule.map(occurrence => (
+                    <FamilyCalendarCard key={occurrence.occurrenceId} occurrence={occurrence} childNamesById={childNamesById} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="На выбранный день нет лекарств, визитов, очередей или задач." />
+              )}
+            </Panel>
+          </section>
+        )}
+
         {view === 'day' && (
           <section className="space-y-4">
             <StatsRow plans={childPlans.length} dietRules={childDietRules.length} foodLogs={childFoodLogs.length} reactions={childReactionLogs.length} />
@@ -622,6 +755,38 @@ function Panel({ title, icon, children }: { title: string; icon: React.ReactNode
   );
 }
 
+function FamilyCalendarCard({ occurrence, childNamesById }: { occurrence: FamilyCalendarOccurrence; childNamesById: Map<string, string> }) {
+  const primaryColor = getChildColorClasses(occurrence.childIds[0] || 'family');
+  return (
+    <div className={`rounded-2xl border border-opora-sage/15 border-l-4 bg-white px-4 py-3 ${primaryColor.line}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-extrabold text-opora-navy">{occurrence.title}</p>
+          <p className="mt-1 text-xs font-bold text-opora-sage">
+            {occurrence.allDay ? 'Весь день' : formatTime(occurrence.occurrenceStartsAt)}
+            {occurrence.occurrenceEndsAt ? `-${formatTime(occurrence.occurrenceEndsAt)}` : ''}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full bg-opora-sand px-2.5 py-1 text-[10px] font-extrabold text-opora-navy">
+          {eventSourceLabels[occurrence.source]}
+        </span>
+      </div>
+      {occurrence.description && <p className="mt-2 text-xs leading-relaxed text-opora-text">{occurrence.description}</p>}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {occurrence.childIds.map(childId => {
+          const color = getChildColorClasses(childId);
+          return (
+            <span key={childId} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${color.badge}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${color.dot}`} />
+              {childNamesById.get(childId) || 'Ребенок'}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function FormField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="mb-3 block">
@@ -706,6 +871,28 @@ function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit'
   }).format(new Date(value));
+}
+
+function formatWeekday(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', { weekday: 'short' }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function formatAgendaTitle(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function getCalendarWindow(startDate: string) {
+  return Array.from({ length: 7 }, (_, index) => addDays(startDate, index));
+}
+
+function addDays(date: string, days: number) {
+  const value = new Date(`${date}T00:00:00.000Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function getChildColorClasses(childId: string) {
+  return childColorClasses[getChildColorToken(childId)] || childColorClasses.teal;
 }
 
 function parsePositiveNumber(value: string) {

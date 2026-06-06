@@ -100,7 +100,185 @@ type GenerateNotificationJobsInput = {
   horizonDays: number;
 };
 
+export type FamilyCalendarMedicationPlanSource = {
+  id: string;
+  childId: string;
+  childName: string;
+  name: string;
+  doseText: string;
+  scheduleText: string;
+  foodRelation: string;
+  reminderTimes: string[];
+  reminderWindowMinutes?: number;
+  repeatEveryMinutes?: number;
+  startDate: string;
+  endDate?: string;
+  active: boolean;
+};
+
+export type FamilyCalendarMedicalBookingSource = {
+  id: string;
+  childId: string;
+  childName: string;
+  doctorName: string;
+  doctorTitle: string;
+  doctorCity: string;
+  date: string;
+  time: string;
+  status: "confirmed" | "completed";
+};
+
+export type FamilyCalendarGovernmentQueueSource = {
+  id: string;
+  childId: string;
+  childName: string;
+  serviceTitle: string;
+  institutionName: string;
+  institutionAddress: string;
+  appointmentAt?: string;
+  status: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FamilyCalendarParentTaskSource = {
+  id: string;
+  childId: string;
+  title: string;
+  description: string;
+  category: "documents" | "therapy" | "school" | "medical" | "home";
+  status: "todo" | "done";
+  dueDate?: string;
+  completedAt?: string;
+  source: "system" | "manual";
+  relatedBookingId?: string;
+};
+
+export type BuildFamilyCalendarEventsInput = {
+  familyId: string;
+  createdByUserId: string;
+  now: string;
+  medicationPlans: FamilyCalendarMedicationPlanSource[];
+  medicalBookings: FamilyCalendarMedicalBookingSource[];
+  governmentQueueRecords: FamilyCalendarGovernmentQueueSource[];
+  parentTasks: FamilyCalendarParentTaskSource[];
+};
+
+export type BuildFamilyCalendarEventsResult = {
+  events: FamilyCalendarEvent[];
+  recurrenceRules: FamilyRecurrenceRule[];
+};
+
 const colorTokens = ["rose", "amber", "emerald", "sky", "violet", "teal", "pink", "indigo"];
+
+export function buildFamilyCalendarEventsFromSources(input: BuildFamilyCalendarEventsInput): BuildFamilyCalendarEventsResult {
+  const events: FamilyCalendarEvent[] = [];
+  const recurrenceRules: FamilyRecurrenceRule[] = [];
+
+  for (const plan of input.medicationPlans) {
+    if (!plan.active) {
+      continue;
+    }
+
+    for (const time of plan.reminderTimes) {
+      const eventId = `medication-${plan.id}-${time.replace(":", "-")}`;
+      events.push({
+        id: eventId,
+        familyId: input.familyId,
+        title: plan.name,
+        description: [plan.doseText, plan.foodRelation, plan.scheduleText].filter(Boolean).join(" · "),
+        eventType: "medicine",
+        source: "medication_plan",
+        sourceId: plan.id,
+        startsAt: localDateTimeToIso(plan.startDate, time),
+        allDay: false,
+        status: "scheduled",
+        childIds: [plan.childId],
+        createdByUserId: input.createdByUserId,
+        createdAt: input.now,
+        updatedAt: input.now
+      });
+      recurrenceRules.push({
+        eventId,
+        frequency: "daily",
+        intervalCount: 1,
+        startsOn: plan.startDate,
+        endsOn: plan.endDate
+      });
+    }
+  }
+
+  for (const booking of input.medicalBookings) {
+    events.push({
+      id: `medical-booking-${booking.id}`,
+      familyId: input.familyId,
+      title: `${booking.doctorTitle}: ${booking.doctorName}`,
+      description: booking.doctorCity,
+      eventType: "appointment",
+      source: "medical_booking",
+      sourceId: booking.id,
+      startsAt: localDateTimeToIso(booking.date, booking.time),
+      allDay: false,
+      status: booking.status === "completed" ? "completed" : "scheduled",
+      childIds: [booking.childId],
+      createdByUserId: input.createdByUserId,
+      createdAt: input.now,
+      updatedAt: input.now
+    });
+  }
+
+  for (const record of input.governmentQueueRecords) {
+    if (!record.appointmentAt || record.status === "cancelled") {
+      continue;
+    }
+
+    events.push({
+      id: `government-queue-${record.id}`,
+      familyId: input.familyId,
+      title: record.serviceTitle,
+      description: [record.institutionName, record.note].filter(Boolean).join(" · "),
+      eventType: "queue",
+      source: "government_queue",
+      sourceId: record.id,
+      startsAt: record.appointmentAt,
+      allDay: false,
+      status: record.status === "completed" ? "completed" : "scheduled",
+      childIds: [record.childId],
+      createdByUserId: input.createdByUserId,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt
+    });
+  }
+
+  for (const task of input.parentTasks) {
+    if (!task.dueDate) {
+      continue;
+    }
+
+    events.push({
+      id: `parent-task-${task.id}`,
+      familyId: input.familyId,
+      title: task.title,
+      description: task.description,
+      eventType: mapParentTaskCategory(task.category),
+      source: "parent_task",
+      sourceId: task.id,
+      startsAt: `${task.dueDate}T00:00:00.000Z`,
+      allDay: true,
+      status: task.status === "done" ? "completed" : "scheduled",
+      childIds: [task.childId],
+      createdByUserId: input.createdByUserId,
+      createdAt: input.now,
+      updatedAt: task.completedAt ?? input.now
+    });
+  }
+
+  return {
+    events: events.sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
+    recurrenceRules
+  };
+}
 
 export function expandFamilyEventOccurrences(input: ExpandFamilyEventOccurrencesInput): FamilyCalendarOccurrence[] {
   const rulesByEventId = new Map(input.recurrenceRules.map(rule => [rule.eventId, rule]));
@@ -293,4 +471,13 @@ function toIsoDate(date: Date): string {
 
 function getCalendarWeekday(occurrenceDate: string): number {
   return (new Date(`${occurrenceDate}T00:00:00.000Z`).getUTCDay() + 6) % 7;
+}
+
+function localDateTimeToIso(date: string, time: string): string {
+  return new Date(`${date}T${time}:00`).toISOString();
+}
+
+function mapParentTaskCategory(category: FamilyCalendarParentTaskSource["category"]): FamilyEventType {
+  if (category === "medical") return "appointment";
+  return category;
 }

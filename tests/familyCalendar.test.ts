@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  buildFamilyCalendarEventsFromSources,
   expandFamilyEventOccurrences,
   generateNotificationJobs,
   getChildColorToken,
@@ -182,4 +183,98 @@ test("creates scheduled notification jobs inside the horizon", () => {
 test("child color tokens are stable", () => {
   assert.equal(getChildColorToken("child-1"), getChildColorToken("child-1"));
   assert.notEqual(getChildColorToken("child-1"), "");
+});
+
+test("builds shared family schedule events from care sources", () => {
+  const { events, recurrenceRules } = buildFamilyCalendarEventsFromSources({
+    familyId: "family-1",
+    createdByUserId: "parent-1",
+    now: "2026-06-01T08:00:00.000Z",
+    medicationPlans: [
+      {
+        id: "plan-1",
+        childId: "child-1",
+        childName: "Алишер",
+        name: "Витамин D",
+        doseText: "1 капля",
+        scheduleText: "Каждый день утром",
+        foodRelation: "после завтрака",
+        reminderTimes: ["09:00"],
+        reminderWindowMinutes: 30,
+        repeatEveryMinutes: 15,
+        startDate: "2026-06-01",
+        active: true
+      }
+    ],
+    medicalBookings: [
+      {
+        id: "booking-1",
+        childId: "child-2",
+        childName: "Мира",
+        doctorName: "Д-р Ким",
+        doctorTitle: "Невролог",
+        doctorCity: "Алматы",
+        date: "2026-06-02",
+        time: "11:30",
+        status: "confirmed"
+      }
+    ],
+    governmentQueueRecords: [
+      {
+        id: "queue-1",
+        childId: "child-1",
+        childName: "Алишер",
+        serviceTitle: "ПМПК",
+        institutionName: "КППК",
+        institutionAddress: "Алматы",
+        appointmentAt: "2026-06-03T05:00:00.000Z",
+        status: "waiting",
+        createdAt: "2026-06-01T08:00:00.000Z",
+        updatedAt: "2026-06-01T08:00:00.000Z"
+      }
+    ],
+    parentTasks: [
+      {
+        id: "task-1",
+        childId: "child-2",
+        title: "Собрать заключения",
+        description: "Проверить папку перед приемом",
+        category: "documents",
+        status: "todo",
+        dueDate: "2026-06-04",
+        source: "manual"
+      }
+    ]
+  });
+
+  assert.deepEqual(events.map(event => event.source), [
+    "medication_plan",
+    "medical_booking",
+    "government_queue",
+    "parent_task"
+  ]);
+  assert.deepEqual(events.map(event => event.childIds), [["child-1"], ["child-2"], ["child-1"], ["child-2"]]);
+  assert.equal(recurrenceRules[0].eventId, "medication-plan-1-09-00");
+
+  const occurrences = expandFamilyEventOccurrences({
+    events,
+    recurrenceRules,
+    exceptions: [],
+    occurrenceStates: [],
+    rangeStart: "2026-06-01T00:00:00.000Z",
+    rangeEnd: "2026-06-05T00:00:00.000Z"
+  });
+
+  assert.deepEqual(
+    occurrences.map(occurrence => `${occurrence.occurrenceDate}:${occurrence.source}:${occurrence.title}`),
+    [
+      "2026-06-01:medication_plan:Витамин D",
+      "2026-06-02:medication_plan:Витамин D",
+      "2026-06-02:medical_booking:Невролог: Д-р Ким",
+      "2026-06-03:medication_plan:Витамин D",
+      "2026-06-03:government_queue:ПМПК",
+      "2026-06-04:parent_task:Собрать заключения",
+      "2026-06-04:medication_plan:Витамин D"
+    ]
+  );
 });
