@@ -1,5 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { DietRuleSummary, MedicationEventSummary } from '../lib/careTracker';
+import type { FamilyCalendarOccurrence, FamilyEventType } from '../lib/familyCalendar';
+import {
+  completeFamilyCalendarEvent,
+  createFamilyCalendarEvent,
+  fetchFamilyCalendar
+} from '../lib/familyCalendarApi';
 import type { GovernmentQueueRecordSummary } from '../lib/governmentQueueMonitor';
 
 export type DiagnosticStatus = 
@@ -267,6 +273,28 @@ interface ProfileContextType {
   foodLogs: FoodLog[];
   reactionLogs: ReactionLog[];
   governmentQueueRecords: GovernmentQueueRecord[];
+  familyCalendarItems: FamilyCalendarOccurrence[];
+  familyCalendarError: string;
+  isFamilyCalendarLoading: boolean;
+  loadFamilyCalendar: (from: string, to: string) => Promise<void>;
+  createCalendarEvent: (event: {
+    title: string;
+    startsAt: string;
+    endsAt?: string;
+    childIds: string[];
+    eventType: FamilyEventType;
+    description?: string;
+    notifyMinutesBefore?: number;
+    recurrenceRule?: {
+      frequency: 'daily' | 'weekly' | 'monthly';
+      intervalCount: number;
+      weekdays?: number[];
+      monthDay?: number;
+      startsOn: string;
+      endsOn?: string;
+    };
+  }) => Promise<void>;
+  completeCalendarOccurrence: (eventId: string, occurrenceDate: string) => Promise<void>;
   addMedicationPlan: (plan: Omit<MedicationPlan, 'id' | 'childName' | 'active'>) => MedicationPlan;
   updateMedicationPlan: (id: string, plan: Partial<MedicationPlan>) => void;
   deleteMedicationPlan: (id: string) => void;
@@ -836,6 +864,10 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return [];
   });
 
+  const [familyCalendarItems, setFamilyCalendarItems] = useState<FamilyCalendarOccurrence[]>([]);
+  const [familyCalendarError, setFamilyCalendarError] = useState('');
+  const [isFamilyCalendarLoading, setIsFamilyCalendarLoading] = useState(false);
+  const [familyCalendarRange, setFamilyCalendarRange] = useState<{ from: string; to: string } | null>(null);
   const [remoteProfileStateLoaded, setRemoteProfileStateLoaded] = useState(false);
 
   useEffect(() => {
@@ -985,6 +1017,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
             dietRules,
             foodLogs,
             reactionLogs,
+            governmentQueueRecords,
             hasSeenOnboarding,
             theme
           }
@@ -1014,6 +1047,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dietRules,
     foodLogs,
     reactionLogs,
+    governmentQueueRecords,
     hasSeenOnboarding,
     theme
   ]);
@@ -1498,6 +1532,66 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return profiles.find(item => item.id === childId)?.childName || profile.childName || 'Ребенок';
   };
 
+  const loadFamilyCalendar = async (from: string, to: string) => {
+    setFamilyCalendarRange({ from, to });
+    setIsFamilyCalendarLoading(true);
+    try {
+      const data = await fetchFamilyCalendar(from, to);
+      setFamilyCalendarItems(Array.isArray(data.items) ? data.items : []);
+      setFamilyCalendarError('');
+    } catch (error) {
+      console.warn('Family calendar API sync failed, local schedule remains available.', error);
+      setFamilyCalendarError(error instanceof Error ? error.message : 'family_calendar_api_failed');
+    } finally {
+      setIsFamilyCalendarLoading(false);
+    }
+  };
+
+  const reloadFamilyCalendar = async () => {
+    if (!familyCalendarRange) return;
+    await loadFamilyCalendar(familyCalendarRange.from, familyCalendarRange.to);
+  };
+
+  const createCalendarEvent = async (event: {
+    title: string;
+    startsAt: string;
+    endsAt?: string;
+    childIds: string[];
+    eventType: FamilyEventType;
+    description?: string;
+    notifyMinutesBefore?: number;
+    recurrenceRule?: {
+      frequency: 'daily' | 'weekly' | 'monthly';
+      intervalCount: number;
+      weekdays?: number[];
+      monthDay?: number;
+      startsOn: string;
+      endsOn?: string;
+    };
+  }) => {
+    try {
+      await createFamilyCalendarEvent(event);
+      setFamilyCalendarError('');
+      await reloadFamilyCalendar();
+    } catch (error) {
+      console.warn('Family calendar create failed.', error);
+      setFamilyCalendarError(error instanceof Error ? error.message : 'family_calendar_create_failed');
+      throw error;
+    }
+  };
+
+  const completeCalendarOccurrence = async (eventId: string, occurrenceDate: string) => {
+    try {
+      await completeFamilyCalendarEvent(eventId, occurrenceDate);
+      setFamilyCalendarError('');
+      await reloadFamilyCalendar();
+    } catch (error) {
+      console.warn('Family calendar completion failed.', error);
+      setFamilyCalendarError(error instanceof Error ? error.message : 'family_calendar_complete_failed');
+      throw error;
+    }
+  };
+
   const addMedicationPlan = (planData: Omit<MedicationPlan, 'id' | 'childName' | 'active'>) => {
     const plan: MedicationPlan = {
       ...planData,
@@ -1683,6 +1777,12 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       foodLogs,
       reactionLogs,
       governmentQueueRecords,
+      familyCalendarItems,
+      familyCalendarError,
+      isFamilyCalendarLoading,
+      loadFamilyCalendar,
+      createCalendarEvent,
+      completeCalendarOccurrence,
       addMedicationPlan,
       updateMedicationPlan,
       deleteMedicationPlan,

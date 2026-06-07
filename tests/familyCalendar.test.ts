@@ -10,6 +10,7 @@ import {
   type FamilyNotificationPreference,
   type FamilyRecurrenceRule
 } from "../src/lib/familyCalendar";
+import { POSTGRES_SCHEMA_SQL } from "../db/postgres-schema";
 
 const baseEvent: FamilyCalendarEvent = {
   id: "event-1",
@@ -277,4 +278,20 @@ test("builds shared family schedule events from care sources", () => {
       "2026-06-04:medication_plan:Витамин D"
     ]
   );
+});
+
+test("postgres schema includes family calendar tables", () => {
+  for (const table of [
+    "families",
+    "family_members",
+    "family_calendar_events",
+    "family_event_assignments",
+    "family_recurrence_rules",
+    "family_recurrence_exceptions",
+    "family_event_occurrence_states",
+    "family_notification_preferences",
+    "family_notification_jobs"
+  ]) {
+    assert.match(POSTGRES_SCHEMA_SQL, new RegExp(`create table if not exists ${table}`));
+  }
 });

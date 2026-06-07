@@ -8,6 +8,17 @@ import { Pool } from "pg";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "crypto";
 import { POSTGRES_SCHEMA_SQL } from "./db/postgres-schema";
 import {
+  expandFamilyEventOccurrences,
+  generateNotificationJobs,
+  getChildColorToken,
+  type FamilyCalendarEvent,
+  type FamilyEventType,
+  type FamilyNotificationPreference,
+  type FamilyRecurrenceException,
+  type FamilyRecurrenceRule,
+  type FamilyEventOccurrenceState
+} from "./src/lib/familyCalendar";
+import {
   buildInstitutionChecklist,
   getDefaultInstitutionGuideSeed,
   normalizeDocumentRow,
@@ -221,6 +232,297 @@ app.post("/api/profile-state", async (req, res) => {
   }
 });
 
+app.get("/api/family-calendar", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.json({ familyId: "local", items: [], source: "local-json" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const range = parseCalendarRange(req.query.from, req.query.to);
+    const loaded = await loadFamilyEvents(family.familyId, range.from, range.to);
+    const items = expandFamilyEventOccurrences({
+      events: loaded.events,
+      recurrenceRules: loaded.rules,
+      exceptions: loaded.exceptions,
+      occurrenceStates: loaded.states,
+      rangeStart: range.from,
+      rangeEnd: range.to
+    });
+    res.json({ familyId: family.familyId, items, source: "postgres" });
+  } catch (error: any) {
+    console.error("Family calendar read failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_unavailable" });
+  }
+});
+
+app.post("/api/family-calendar/events", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  const input = req.body as FamilyCalendarEventApi;
+  const title = String(input?.title || "").trim();
+  const startsAt = toIsoOrUndefined(input?.startsAt);
+  if (!title || !startsAt) return res.status(400).json({ error: "invalid_event" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const result = await pgQuery(
+      `insert into family_calendar_events
+       (family_id, title, description, event_type, source, source_id, starts_at, ends_at, all_day, status, created_by_user_id)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'scheduled', $10)
+       returning *`,
+      [
+        family.familyId,
+        title,
+        input.description || null,
+        input.eventType || "family",
+        input.source || "manual",
+        input.sourceId || null,
+        startsAt,
+        toIsoOrUndefined(input.endsAt) || null,
+        Boolean(input.allDay),
+        user.id
+      ]
+    );
+    const eventId = result.rows[0].id as string;
+    const state = await getUserProfileState(user.id);
+    const childDbIds: string[] = [];
+    for (const childId of Array.isArray(input.childIds) ? input.childIds : []) {
+      const childDbId = await ensureFamilyChildFromLocalId(family.familyId, childId, profileFromState(state, childId));
+      childDbIds.push(childDbId);
+      await pgQuery(
+        `insert into family_event_assignments (event_id, child_id)
+         values ($1, $2)
+         on conflict do nothing`,
+        [eventId, childDbId]
+      );
+    }
+
+    if (input.recurrenceRule) {
+      const rule = input.recurrenceRule;
+      await pgQuery(
+        `insert into family_recurrence_rules (event_id, frequency, interval_count, weekdays, month_day, starts_on, ends_on)
+         values ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          eventId,
+          rule.frequency,
+          Math.max(1, Number(rule.intervalCount || 1)),
+          JSON.stringify(Array.isArray(rule.weekdays) ? rule.weekdays : []),
+          rule.monthDay || null,
+          rule.startsOn || dateOnly(startsAt),
+          rule.endsOn || null
+        ]
+      );
+    }
+
+    if (Number.isFinite(Number(input.notifyMinutesBefore))) {
+      await pgQuery(
+        `insert into family_notification_preferences
+         (family_id, child_id, channel, enabled, minutes_before, recipient_user_id)
+         values ($1, $2, 'in_app', true, $3, $4)`,
+        [family.familyId, childDbIds[0] || null, Math.max(0, Number(input.notifyMinutesBefore)), user.id]
+      );
+    }
+    const notificationJobsCreated = await rebuildNotificationJobs(family.familyId, eventId);
+    res.status(201).json({
+      event: familyEventFromDb(result.rows[0], Array.isArray(input.childIds) ? input.childIds : []),
+      notificationJobsCreated
+    });
+  } catch (error: any) {
+    console.error("Family calendar create failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_create_failed" });
+  }
+});
+
+app.patch("/api/family-calendar/events/:id", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const patch = req.body || {};
+    const result = await pgQuery(
+      `update family_calendar_events
+       set title = coalesce($3, title),
+           description = coalesce($4, description),
+           event_type = coalesce($5, event_type),
+           starts_at = coalesce($6::timestamptz, starts_at),
+           ends_at = $7::timestamptz,
+           all_day = coalesce($8, all_day),
+           updated_at = now()
+       where id = $1 and family_id = $2
+       returning *`,
+      [
+        req.params.id,
+        family.familyId,
+        typeof patch.title === "string" && patch.title.trim() ? patch.title.trim() : null,
+        patch.description ?? null,
+        patch.eventType || null,
+        toIsoOrUndefined(patch.startsAt) || null,
+        toIsoOrUndefined(patch.endsAt) || null,
+        typeof patch.allDay === "boolean" ? patch.allDay : null
+      ]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: "event_not_found" });
+    await rebuildNotificationJobs(family.familyId, req.params.id);
+    res.json({ event: familyEventFromDb(result.rows[0]) });
+  } catch (error: any) {
+    console.error("Family calendar update failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_update_failed" });
+  }
+});
+
+app.delete("/api/family-calendar/events/:id", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const result = await pgQuery(
+      "update family_calendar_events set status = 'cancelled', updated_at = now() where id = $1 and family_id = $2 returning id",
+      [req.params.id, family.familyId]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: "event_not_found" });
+    await pgQuery(
+      "update family_notification_jobs set status = 'cancelled', updated_at = now() where event_id = $1 and family_id = $2 and status = 'scheduled'",
+      [req.params.id, family.familyId]
+    );
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Family calendar delete failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_delete_failed" });
+  }
+});
+
+app.post("/api/family-calendar/events/:id/complete", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  const occurrenceDate = String(req.body?.occurrenceDate || "").slice(0, 10);
+  if (!occurrenceDate) return res.status(400).json({ error: "occurrence_date_required" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const event = await pgQuery("select id from family_calendar_events where id = $1 and family_id = $2", [req.params.id, family.familyId]);
+    if (!event.rows[0]) return res.status(404).json({ error: "event_not_found" });
+    await pgQuery(
+      `insert into family_event_occurrence_states (event_id, occurrence_date, status, completed_by_user_id, completed_at)
+       values ($1, $2, 'completed', $3, now())
+       on conflict (event_id, occurrence_date)
+       do update set status = 'completed', completed_by_user_id = excluded.completed_by_user_id, completed_at = now(), updated_at = now()`,
+      [req.params.id, occurrenceDate, user.id]
+    );
+    res.json({ ok: true });
+  } catch (error: any) {
+    console.error("Family calendar complete failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_complete_failed" });
+  }
+});
+
+app.post("/api/family-calendar/events/:id/exceptions", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  const occurrenceDate = String(req.body?.occurrenceDate || "").slice(0, 10);
+  if (!occurrenceDate) return res.status(400).json({ error: "occurrence_date_required" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const event = await pgQuery("select id from family_calendar_events where id = $1 and family_id = $2", [req.params.id, family.familyId]);
+    if (!event.rows[0]) return res.status(404).json({ error: "event_not_found" });
+    const action = req.body?.action === "move" ? "move" : "skip";
+    await pgQuery(
+      `insert into family_recurrence_exceptions (event_id, occurrence_date, action, moved_starts_at, moved_ends_at)
+       values ($1, $2, $3, $4, $5)`,
+      [req.params.id, occurrenceDate, action, toIsoOrUndefined(req.body?.movedStartsAt) || null, toIsoOrUndefined(req.body?.movedEndsAt) || null]
+    );
+    await rebuildNotificationJobs(family.familyId, req.params.id);
+    res.status(201).json({ ok: true });
+  } catch (error: any) {
+    console.error("Family calendar exception failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_exception_failed" });
+  }
+});
+
+app.get("/api/family-calendar/notification-preferences", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.json({ items: [] });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const result = await pgQuery(
+      "select * from family_notification_preferences where family_id = $1 order by created_at desc",
+      [family.familyId]
+    );
+    res.json({ items: result.rows.map(notificationPreferenceFromDb) });
+  } catch (error: any) {
+    console.error("Family calendar preferences read failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_preferences_unavailable" });
+  }
+});
+
+app.patch("/api/family-calendar/notification-preferences", async (req, res) => {
+  if (requiresPersistentDatabase(res)) return;
+
+  const user = await requireAuth(req, res);
+  if (!user) return;
+  if (!postgresConfig()) return res.status(503).json({ error: "postgres_required" });
+
+  try {
+    const family = await ensureUserFamily(user);
+    const state = await getUserProfileState(user.id);
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    await pgQuery("delete from family_notification_preferences where family_id = $1", [family.familyId]);
+    for (const item of items) {
+      const channel = ["web_push", "email", "sms", "in_app"].includes(item.channel) ? item.channel : "in_app";
+      const childDbId = item.childId
+        ? await ensureFamilyChildFromLocalId(family.familyId, item.childId, profileFromState(state, item.childId))
+        : null;
+      await pgQuery(
+        `insert into family_notification_preferences
+         (family_id, child_id, channel, enabled, minutes_before, quiet_hours_start, quiet_hours_end, recipient_user_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          family.familyId,
+          childDbId,
+          channel,
+          Boolean(item.enabled),
+          Math.max(0, Number(item.minutesBefore || 30)),
+          item.quietHoursStart || null,
+          item.quietHoursEnd || null,
+          item.recipientUserId || user.id
+        ]
+      );
+    }
+    const notificationJobsCreated = await rebuildNotificationJobs(family.familyId);
+    res.json({ ok: true, notificationJobsCreated });
+  } catch (error: any) {
+    console.error("Family calendar preferences save failed:", error?.message || error);
+    res.status(500).json({ error: "family_calendar_preferences_save_failed" });
+  }
+});
+
 type AppRole = "parent" | "doctor" | "admin";
 type CareRequestStatus = "parent_requested" | "doctor_accepted" | "first_consult_done" | "full_access" | "declined";
 
@@ -276,6 +578,27 @@ type AuthState = {
     expiresAt: string;
   }>;
   profileStates: Record<string, any>;
+  institutionChecklistProgress: Record<string, string[]>;
+};
+
+type FamilyCalendarEventApi = {
+  id?: string;
+  familyId?: string;
+  title: string;
+  description?: string;
+  eventType: FamilyEventType;
+  source?: "manual" | "medication_plan" | "medical_booking" | "government_queue" | "parent_task";
+  sourceId?: string;
+  startsAt: string;
+  endsAt?: string;
+  allDay?: boolean;
+  status?: "scheduled" | "completed" | "cancelled";
+  childIds?: string[];
+  createdByUserId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  recurrenceRule?: Omit<FamilyRecurrenceRule, "eventId">;
+  notifyMinutesBefore?: number;
 };
 
 const runtimeStatePath = path.join(process.cwd(), "data", "runtime-care-state.json");
@@ -327,10 +650,13 @@ const readLocalAuthState = async (): Promise<AuthState> => {
     return {
       users: Array.isArray(parsed.users) ? parsed.users : [],
       sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
-      profileStates: parsed.profileStates && typeof parsed.profileStates === "object" ? parsed.profileStates : {}
+      profileStates: parsed.profileStates && typeof parsed.profileStates === "object" ? parsed.profileStates : {},
+      institutionChecklistProgress: parsed.institutionChecklistProgress && typeof parsed.institutionChecklistProgress === "object"
+        ? parsed.institutionChecklistProgress
+        : {}
     };
   } catch {
-    const initial: AuthState = { users: [], sessions: [], profileStates: {} };
+    const initial: AuthState = { users: [], sessions: [], profileStates: {}, institutionChecklistProgress: {} };
     await writeLocalAuthState(initial);
     return initial;
   }
@@ -605,6 +931,224 @@ const requireAuth = async (req: express.Request, res: express.Response): Promise
     return null;
   }
   return user;
+};
+
+const dateOnly = (value: string | Date) => {
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+};
+
+const toIsoOrUndefined = (value: any) => {
+  if (!value) return undefined;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+};
+
+const parseCalendarRange = (from?: any, to?: any) => {
+  const now = new Date();
+  const defaultStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const defaultEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const start = toIsoOrUndefined(from) ? new Date(from) : defaultStart;
+  let end = toIsoOrUndefined(to) ? new Date(to) : defaultEnd;
+  const maxEnd = new Date(start.getTime() + 1000 * 60 * 60 * 24 * 90);
+  if (end.getTime() > maxEnd.getTime()) end = maxEnd;
+  if (end.getTime() <= start.getTime()) end = new Date(start.getTime() + 1000 * 60 * 60 * 24);
+  return { from: start.toISOString(), to: end.toISOString() };
+};
+
+const ensureUserFamily = async (user: AuthUser) => {
+  const existing = await pgQuery(
+    `select family_id, role
+     from family_members
+     where user_id = $1
+     order by created_at asc
+     limit 1`,
+    [user.id]
+  );
+  if (existing.rows[0]) {
+    return { familyId: existing.rows[0].family_id as string, role: existing.rows[0].role as string };
+  }
+
+  const family = await pgQuery(
+    `insert into families (owner_user_id, display_name)
+     values ($1, $2)
+     returning id`,
+    [user.id, `${user.fullName || "Родитель"}: семья`]
+  );
+  const familyId = family.rows[0].id as string;
+  await pgQuery(
+    `insert into family_members (family_id, user_id, role)
+     values ($1, $2, 'owner')
+     on conflict (family_id, user_id) do nothing`,
+    [familyId, user.id]
+  );
+  return { familyId, role: "owner" };
+};
+
+const profileFromState = (state: any, localChildId: string) => {
+  const profiles = Array.isArray(state?.profiles) ? state.profiles : [];
+  return profiles.find((profile: any) => profile?.id === localChildId) || null;
+};
+
+const getUserProfileState = async (userId: string) => {
+  const result = await pgQuery("select state from user_profile_state where user_id = $1", [userId]);
+  return result.rows[0]?.state || {};
+};
+
+const ensureFamilyChildFromLocalId = async (familyId: string, localChildId: string, profile?: any) => {
+  const name = String(profile?.childName || profile?.name || "Ребенок").trim() || "Ребенок";
+  const ageYears = Number(profile?.childAge ?? profile?.age_years ?? 0) || 0;
+  const diagnosticStatus = profile?.diagnosticStatus || profile?.diagnostic_status || null;
+  const city = profile?.userCity || profile?.city || null;
+  const colorToken = getChildColorToken(localChildId);
+  const result = await pgQuery(
+    `insert into children (family_id, local_child_id, name, age_years, diagnostic_status, city, color_token, updated_at)
+     values ($1, $2, $3, $4, $5, $6, $7, now())
+     on conflict (local_child_id)
+     do update set family_id = excluded.family_id,
+                   name = excluded.name,
+                   age_years = excluded.age_years,
+                   diagnostic_status = excluded.diagnostic_status,
+                   city = excluded.city,
+                   color_token = excluded.color_token,
+                   updated_at = now()
+     returning id`,
+    [familyId, localChildId, name, Math.max(0, Math.min(18, ageYears)), diagnosticStatus, city, colorToken]
+  );
+  return result.rows[0].id as string;
+};
+
+const familyEventFromDb = (row: any, childIds: string[] = []): FamilyCalendarEvent => ({
+  id: row.id,
+  familyId: row.family_id,
+  title: row.title,
+  description: row.description || "",
+  eventType: row.event_type,
+  source: row.source,
+  sourceId: row.source_id || undefined,
+  startsAt: new Date(row.starts_at).toISOString(),
+  endsAt: row.ends_at ? new Date(row.ends_at).toISOString() : undefined,
+  allDay: Boolean(row.all_day),
+  status: row.status,
+  childIds,
+  createdByUserId: row.created_by_user_id,
+  createdAt: new Date(row.created_at).toISOString(),
+  updatedAt: new Date(row.updated_at).toISOString()
+});
+
+const recurrenceRuleFromDb = (row: any): FamilyRecurrenceRule => ({
+  eventId: row.event_id,
+  frequency: row.frequency,
+  intervalCount: Number(row.interval_count || 1),
+  weekdays: Array.isArray(row.weekdays) ? row.weekdays : [],
+  monthDay: row.month_day || undefined,
+  startsOn: dateOnly(row.starts_on),
+  endsOn: row.ends_on ? dateOnly(row.ends_on) : undefined
+});
+
+const recurrenceExceptionFromDb = (row: any): FamilyRecurrenceException => ({
+  id: row.id,
+  eventId: row.event_id,
+  occurrenceDate: dateOnly(row.occurrence_date),
+  action: row.action,
+  movedStartsAt: row.moved_starts_at ? new Date(row.moved_starts_at).toISOString() : undefined,
+  movedEndsAt: row.moved_ends_at ? new Date(row.moved_ends_at).toISOString() : undefined
+});
+
+const occurrenceStateFromDb = (row: any): FamilyEventOccurrenceState => ({
+  id: row.id,
+  eventId: row.event_id,
+  occurrenceDate: dateOnly(row.occurrence_date),
+  status: row.status,
+  completedByUserId: row.completed_by_user_id || undefined,
+  completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : undefined
+});
+
+const notificationPreferenceFromDb = (row: any): FamilyNotificationPreference => ({
+  id: row.id,
+  familyId: row.family_id,
+  childId: row.child_id || undefined,
+  channel: row.channel,
+  enabled: Boolean(row.enabled),
+  minutesBefore: Number(row.minutes_before || 30),
+  recipientUserId: row.recipient_user_id
+});
+
+const loadFamilyEvents = async (familyId: string, rangeStart: string, rangeEnd: string) => {
+  const events = await pgQuery(
+    `select *
+     from family_calendar_events
+     where family_id = $1
+       and status <> 'cancelled'
+       and starts_at < $3::timestamptz
+     order by starts_at asc`,
+    [familyId, rangeStart, rangeEnd]
+  );
+  const eventIds = events.rows.map(row => row.id);
+  if (!eventIds.length) {
+    return { events: [], rules: [], exceptions: [], states: [] };
+  }
+
+  const [assignments, rules, exceptions, states] = await Promise.all([
+    pgQuery(
+      `select family_event_assignments.event_id, coalesce(children.local_child_id, children.id::text) as child_id
+       from family_event_assignments
+       join children on children.id = family_event_assignments.child_id
+       where family_event_assignments.event_id = any($1::uuid[])`,
+      [eventIds]
+    ),
+    pgQuery("select * from family_recurrence_rules where event_id = any($1::uuid[])", [eventIds]),
+    pgQuery("select * from family_recurrence_exceptions where event_id = any($1::uuid[])", [eventIds]),
+    pgQuery("select * from family_event_occurrence_states where event_id = any($1::uuid[])", [eventIds])
+  ]);
+  const childIdsByEvent = new Map<string, string[]>();
+  for (const row of assignments.rows) {
+    childIdsByEvent.set(row.event_id, [...(childIdsByEvent.get(row.event_id) || []), row.child_id]);
+  }
+  return {
+    events: events.rows.map(row => familyEventFromDb(row, childIdsByEvent.get(row.id) || [])),
+    rules: rules.rows.map(recurrenceRuleFromDb),
+    exceptions: exceptions.rows.map(recurrenceExceptionFromDb),
+    states: states.rows.map(occurrenceStateFromDb)
+  };
+};
+
+const rebuildNotificationJobs = async (familyId: string, eventId?: string) => {
+  const rangeStart = new Date().toISOString();
+  const rangeEnd = new Date(Date.now() + 1000 * 60 * 60 * 24 * 60).toISOString();
+  const loaded = await loadFamilyEvents(familyId, rangeStart, rangeEnd);
+  const occurrences = expandFamilyEventOccurrences({
+    events: eventId ? loaded.events.filter(event => event.id === eventId) : loaded.events,
+    recurrenceRules: loaded.rules,
+    exceptions: loaded.exceptions,
+    occurrenceStates: loaded.states,
+    rangeStart,
+    rangeEnd
+  });
+  const preferences = await pgQuery("select * from family_notification_preferences where family_id = $1 and enabled = true", [familyId]);
+  const jobs = generateNotificationJobs({
+    familyId,
+    occurrences,
+    preferences: preferences.rows.map(notificationPreferenceFromDb),
+    now: rangeStart,
+    horizonDays: 60
+  });
+  const eventIds = eventId ? [eventId] : loaded.events.map(event => event.id);
+  if (eventIds.length) {
+    await pgQuery(
+      "update family_notification_jobs set status = 'cancelled', updated_at = now() where family_id = $1 and event_id = any($2::uuid[]) and status = 'scheduled'",
+      [familyId, eventIds]
+    );
+  }
+  for (const job of jobs) {
+    await pgQuery(
+      `insert into family_notification_jobs
+       (family_id, event_id, occurrence_starts_at, deliver_at, channel, status)
+       values ($1, $2, $3, $4, $5, $6)`,
+      [job.familyId, job.eventId, occurrences.find(item => item.occurrenceId === job.occurrenceId)?.occurrenceStartsAt || job.deliverAt, job.deliverAt, job.channel, job.status]
+    );
+  }
+  return jobs.length;
 };
 
 const listPostgresCareRequests = async (childId?: string) => {
@@ -1187,6 +1731,86 @@ const filterInstitutionSeed = (params: { city?: string; kind?: string; q?: strin
   return { items, documents: seed.documents };
 };
 
+const progressStorageKey = (userId: string, childId: string, institutionId: string) =>
+  `${userId}:${childId}:${institutionId}`;
+
+const normalizeCheckedDocumentIds = (value: unknown) => {
+  const items = Array.isArray(value) ? value : [];
+  return [...new Set(items.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map(item => item.trim()))];
+};
+
+const listChecklistProgress = async (userId: string, childId: string, institutionId: string) => {
+  if (postgresConfig()) {
+    const result = await pgQuery<{ document_id: string }>(
+      `select document_id
+       from institution_checklist_progress
+       where user_id = $1 and local_child_id = $2 and institution_id = $3 and checked = true
+       order by updated_at, document_id`,
+      [userId, childId, institutionId]
+    );
+    return result.rows.map(row => row.document_id);
+  }
+
+  if (supabaseConfig()) {
+    const rows = await supabaseFetch(
+      "institution_checklist_progress",
+      {},
+      `?user_id=eq.${encodeURIComponent(userId)}&local_child_id=eq.${encodeURIComponent(childId)}&institution_id=eq.${encodeURIComponent(institutionId)}&checked=eq.true&select=document_id,updated_at&order=updated_at.asc,document_id.asc`
+    );
+    return Array.isArray(rows) ? rows.map(row => String(row.document_id)).filter(Boolean) : [];
+  }
+
+  const state = await readLocalAuthState();
+  return state.institutionChecklistProgress[progressStorageKey(userId, childId, institutionId)] || [];
+};
+
+const replaceChecklistProgress = async (
+  userId: string,
+  childId: string,
+  institutionId: string,
+  checkedDocumentIds: string[]
+) => {
+  if (postgresConfig()) {
+    await pgQuery(
+      "delete from institution_checklist_progress where user_id = $1 and local_child_id = $2 and institution_id = $3",
+      [userId, childId, institutionId]
+    );
+    for (const documentId of checkedDocumentIds) {
+      await pgQuery(
+        `insert into institution_checklist_progress (user_id, local_child_id, institution_id, document_id, checked, updated_at)
+         values ($1, $2, $3, $4, true, now())
+         on conflict (user_id, local_child_id, institution_id, document_id)
+         do update set checked = true, updated_at = now()`,
+        [userId, childId, institutionId, documentId]
+      );
+    }
+    return checkedDocumentIds;
+  }
+
+  if (supabaseConfig()) {
+    const query = `?user_id=eq.${encodeURIComponent(userId)}&local_child_id=eq.${encodeURIComponent(childId)}&institution_id=eq.${encodeURIComponent(institutionId)}`;
+    await supabaseFetch("institution_checklist_progress", { method: "DELETE" }, query);
+    if (checkedDocumentIds.length) {
+      await supabaseFetch("institution_checklist_progress", {
+        method: "POST",
+        body: JSON.stringify(checkedDocumentIds.map(documentId => ({
+          user_id: userId,
+          local_child_id: childId,
+          institution_id: institutionId,
+          document_id: documentId,
+          checked: true
+        })))
+      });
+    }
+    return checkedDocumentIds;
+  }
+
+  const state = await readLocalAuthState();
+  state.institutionChecklistProgress[progressStorageKey(userId, childId, institutionId)] = checkedDocumentIds;
+  await writeLocalAuthState(state);
+  return checkedDocumentIds;
+};
+
 app.get("/api/institutions", async (req, res) => {
   try {
     const city = String(req.query.city || "").trim();
@@ -1322,6 +1946,39 @@ app.get("/api/institutions/:id/checklist", async (req, res) => {
   } catch (error: any) {
     console.error("Institution checklist API error:", error?.message || error);
     res.status(500).json({ error: "institution_checklist unavailable" });
+  }
+});
+
+app.get("/api/institutions/:id/checklist-progress", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  const childId = String(req.query.childId || "").trim();
+  if (!childId) return res.status(400).json({ error: "child_id_required" });
+
+  try {
+    const checkedDocumentIds = await listChecklistProgress(user.id, childId, req.params.id);
+    res.json({ childId, institutionId: req.params.id, checkedDocumentIds });
+  } catch (error: any) {
+    console.error("Institution checklist progress read failed:", error?.message || error);
+    res.status(503).json({ error: "institution_checklist_progress_unavailable" });
+  }
+});
+
+app.put("/api/institutions/:id/checklist-progress", async (req, res) => {
+  const user = await requireAuth(req, res);
+  if (!user) return;
+
+  const childId = String(req.body?.childId || "").trim();
+  if (!childId) return res.status(400).json({ error: "child_id_required" });
+
+  try {
+    const checkedDocumentIds = normalizeCheckedDocumentIds(req.body?.checkedDocumentIds);
+    const savedIds = await replaceChecklistProgress(user.id, childId, req.params.id, checkedDocumentIds);
+    res.json({ childId, institutionId: req.params.id, checkedDocumentIds: savedIds });
+  } catch (error: any) {
+    console.error("Institution checklist progress save failed:", error?.message || error);
+    res.status(503).json({ error: "institution_checklist_progress_save_failed" });
   }
 });
 

@@ -32,6 +32,7 @@ import {
   expandFamilyEventOccurrences,
   getChildColorToken,
   type FamilyCalendarOccurrence,
+  type FamilyEventType,
   type FamilyEventSource
 } from '../lib/familyCalendar';
 import {
@@ -87,6 +88,12 @@ export function CareTrackerTab() {
     foodLogs,
     reactionLogs,
     governmentQueueRecords,
+    familyCalendarItems,
+    familyCalendarError,
+    isFamilyCalendarLoading,
+    loadFamilyCalendar,
+    createCalendarEvent,
+    completeCalendarOccurrence,
     addMedicationPlan,
     deleteMedicationPlan,
     recordMedicationEvent,
@@ -127,6 +134,14 @@ export function CareTrackerTab() {
   const [queueNumber, setQueueNumber] = React.useState('');
   const [currentQueueNumber, setCurrentQueueNumber] = React.useState('');
   const [queueNote, setQueueNote] = React.useState('');
+  const [familyEventTitle, setFamilyEventTitle] = React.useState('');
+  const [familyEventChildId, setFamilyEventChildId] = React.useState<CalendarChildFilter>('all');
+  const [familyEventType, setFamilyEventType] = React.useState<FamilyEventType>('family');
+  const [familyEventStartsAt, setFamilyEventStartsAt] = React.useState(nowLocalInput());
+  const [familyEventDescription, setFamilyEventDescription] = React.useState('');
+  const [familyEventRepeat, setFamilyEventRepeat] = React.useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+  const [familyEventNotifyMinutes, setFamilyEventNotifyMinutes] = React.useState('30');
+  const [familyEventSaving, setFamilyEventSaving] = React.useState(false);
   const [reportCopied, setReportCopied] = React.useState(false);
 
   React.useEffect(() => {
@@ -147,7 +162,11 @@ export function CareTrackerTab() {
   const calendarDays = getCalendarWindow(todayDate());
   const calendarRangeStart = `${calendarDays[0]}T00:00:00.000Z`;
   const calendarRangeEnd = `${addDays(calendarDays[calendarDays.length - 1], 1)}T00:00:00.000Z`;
-  const familySchedule = React.useMemo(() => {
+  React.useEffect(() => {
+    loadFamilyCalendar(calendarRangeStart, calendarRangeEnd);
+  }, [calendarRangeEnd, calendarRangeStart]);
+
+  const localFamilySchedule = React.useMemo(() => {
     const familyEvents = buildFamilyCalendarEventsFromSources({
       familyId: 'local-family',
       createdByUserId: 'local-parent',
@@ -167,6 +186,9 @@ export function CareTrackerTab() {
       rangeEnd: calendarRangeEnd
     });
   }, [calendarRangeEnd, calendarRangeStart, governmentQueueRecords, medicalBookings, medicationPlans, parentTasks]);
+  const familySchedule = React.useMemo(() => {
+    return [...familyCalendarItems, ...localFamilySchedule].sort((a, b) => a.occurrenceStartsAt.localeCompare(b.occurrenceStartsAt));
+  }, [familyCalendarItems, localFamilySchedule]);
   const visibleSchedule = familySchedule.filter(occurrence =>
     calendarChildFilter === 'all' || occurrence.childIds.includes(calendarChildFilter)
   );
@@ -314,6 +336,36 @@ export function CareTrackerTab() {
     setQueueNote('');
   };
 
+  const handleAddFamilyEvent = async () => {
+    const startsAt = new Date(familyEventStartsAt);
+    if (!familyEventTitle.trim() || Number.isNaN(startsAt.getTime())) return;
+    const childIds = familyEventChildId === 'all' ? [] : [familyEventChildId];
+    setFamilyEventSaving(true);
+    try {
+      await createCalendarEvent({
+        title: familyEventTitle.trim(),
+        startsAt: startsAt.toISOString(),
+        childIds,
+        eventType: familyEventType,
+        description: familyEventDescription.trim() || undefined,
+        notifyMinutesBefore: parsePositiveNumber(familyEventNotifyMinutes) ?? 30,
+        recurrenceRule: familyEventRepeat === 'none' ? undefined : {
+          frequency: familyEventRepeat,
+          intervalCount: 1,
+          weekdays: familyEventRepeat === 'weekly' ? [startsAt.getDay()] : undefined,
+          monthDay: familyEventRepeat === 'monthly' ? startsAt.getDate() : undefined,
+          startsOn: startsAt.toISOString().slice(0, 10)
+        }
+      });
+      setFamilyEventTitle('');
+      setFamilyEventDescription('');
+      setFamilyEventRepeat('none');
+      setFamilyEventStartsAt(nowLocalInput());
+    } finally {
+      setFamilyEventSaving(false);
+    }
+  };
+
   const handleCopyReport = async () => {
     try {
       await navigator.clipboard.writeText(reportText);
@@ -449,11 +501,74 @@ export function CareTrackerTab() {
               </div>
             </Panel>
 
+            <Panel title="Семейное событие" icon={<Plus size={18} />}>
+              {familyCalendarError && (
+                <div className="mb-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-900">
+                  Серверный календарь временно недоступен: {familyCalendarError}
+                </div>
+              )}
+              <FormField label="Название">
+                <input value={familyEventTitle} onChange={e => setFamilyEventTitle(e.target.value)} placeholder="Например, логопед или документы" className={inputClass} />
+              </FormField>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Ребенок">
+                  <select value={familyEventChildId} onChange={e => setFamilyEventChildId(e.target.value)} className={inputClass}>
+                    <option value="all">Вся семья</option>
+                    {profiles.map(child => <option key={child.id} value={child.id}>{child.childName}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Тип">
+                  <select value={familyEventType} onChange={e => setFamilyEventType(e.target.value as FamilyEventType)} className={inputClass}>
+                    <option value="family">Семья</option>
+                    <option value="therapy">Терапия</option>
+                    <option value="school">Школа</option>
+                    <option value="documents">Документы</option>
+                    <option value="home">Дом</option>
+                    <option value="appointment">Визит</option>
+                  </select>
+                </FormField>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Дата и время">
+                  <input type="datetime-local" value={familyEventStartsAt} onChange={e => setFamilyEventStartsAt(e.target.value)} className={inputClass} />
+                </FormField>
+                <FormField label="Повтор">
+                  <select value={familyEventRepeat} onChange={e => setFamilyEventRepeat(e.target.value as typeof familyEventRepeat)} className={inputClass}>
+                    <option value="none">Нет</option>
+                    <option value="daily">Каждый день</option>
+                    <option value="weekly">Каждую неделю</option>
+                    <option value="monthly">Каждый месяц</option>
+                  </select>
+                </FormField>
+              </div>
+              <FormField label="Напоминание за минут">
+                <input inputMode="numeric" value={familyEventNotifyMinutes} onChange={e => setFamilyEventNotifyMinutes(e.target.value)} className={inputClass} />
+              </FormField>
+              <FormField label="Заметка">
+                <textarea value={familyEventDescription} onChange={e => setFamilyEventDescription(e.target.value)} placeholder="Что взять, куда идти, кому позвонить" className={`${inputClass} min-h-20 resize-none`} />
+              </FormField>
+              <button
+                type="button"
+                onClick={handleAddFamilyEvent}
+                disabled={familyEventSaving || isFamilyCalendarLoading}
+                className="mt-2 w-full rounded-2xl bg-opora-navy px-4 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+              >
+                {familyEventSaving ? 'Сохраняем...' : 'Сохранить в общий календарь'}
+              </button>
+            </Panel>
+
             <Panel title={formatAgendaTitle(selectedCalendarDate)} icon={<Clock size={18} />}>
               {selectedDaySchedule.length ? (
                 <div className="space-y-3">
                   {selectedDaySchedule.map(occurrence => (
-                    <FamilyCalendarCard key={occurrence.occurrenceId} occurrence={occurrence} childNamesById={childNamesById} />
+                    <FamilyCalendarCard
+                      key={occurrence.occurrenceId}
+                      occurrence={occurrence}
+                      childNamesById={childNamesById}
+                      onComplete={occurrence.source === 'manual' && occurrence.occurrenceStatus === 'scheduled'
+                        ? () => completeCalendarOccurrence(occurrence.id, occurrence.occurrenceDate)
+                        : undefined}
+                    />
                   ))}
                 </div>
               ) : (
@@ -755,7 +870,15 @@ function Panel({ title, icon, children }: { title: string; icon: React.ReactNode
   );
 }
 
-function FamilyCalendarCard({ occurrence, childNamesById }: { occurrence: FamilyCalendarOccurrence; childNamesById: Map<string, string> }) {
+function FamilyCalendarCard({
+  occurrence,
+  childNamesById,
+  onComplete
+}: {
+  occurrence: FamilyCalendarOccurrence;
+  childNamesById: Map<string, string>;
+  onComplete?: () => void;
+}) {
   const primaryColor = getChildColorClasses(occurrence.childIds[0] || 'family');
   return (
     <div className={`rounded-2xl border border-opora-sage/15 border-l-4 bg-white px-4 py-3 ${primaryColor.line}`}>
@@ -773,7 +896,7 @@ function FamilyCalendarCard({ occurrence, childNamesById }: { occurrence: Family
       </div>
       {occurrence.description && <p className="mt-2 text-xs leading-relaxed text-opora-text">{occurrence.description}</p>}
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {occurrence.childIds.map(childId => {
+        {occurrence.childIds.length ? occurrence.childIds.map(childId => {
           const color = getChildColorClasses(childId);
           return (
             <span key={childId} className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${color.badge}`}>
@@ -781,7 +904,21 @@ function FamilyCalendarCard({ occurrence, childNamesById }: { occurrence: Family
               {childNamesById.get(childId) || 'Ребенок'}
             </span>
           );
-        })}
+        }) : (
+          <span className="inline-flex items-center rounded-full border border-opora-sage/10 bg-opora-sand px-2.5 py-1 text-[10px] font-extrabold text-opora-navy">
+            Вся семья
+          </span>
+        )}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-extrabold uppercase tracking-wider text-opora-text">
+          {occurrence.recurrenceLabel ? `${occurrence.recurrenceLabel} · ` : ''}Напоминания на сервере
+        </span>
+        {onComplete && (
+          <button type="button" onClick={onComplete} className="rounded-xl bg-opora-sage px-3 py-2 text-[11px] font-extrabold text-white">
+            Готово
+          </button>
+        )}
       </div>
     </div>
   );
