@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -93,4 +94,15 @@ test("medical case tracker calculates visible progress and next action", () => {
   assert.equal(progress.percent, Math.round(100 / route.steps.length));
   assert.equal(next?.id, "doctor_extracts");
   assert.match(next?.action || "", /врач/i);
+});
+
+test("assistant medical route card renders route details beyond prompt injection", async () => {
+  const source = await readFile(new URL("../src/components/AIAssistantTab.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /medicalCaseRoute/);
+  assert.match(source, /criticalAction/);
+  assert.match(source, /documents\.filter/);
+  assert.match(source, /foundations\.map/);
+  assert.match(source, /templates\.map/);
+  assert.match(source, /navigator\.clipboard\.writeText/);
 });

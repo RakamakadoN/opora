@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital, CheckCircle2, Circle, Clock3 } from 'lucide-react';
+import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital, CheckCircle2, Circle, Clock3, Copy, ExternalLink } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useProfile } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
@@ -103,6 +103,7 @@ export function AIAssistantTab() {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [medicalCaseTracker, setMedicalCaseTracker] = useState<MedicalCaseTracker | null>(null);
+  const [copiedMedicalTemplateId, setCopiedMedicalTemplateId] = useState<string | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -140,11 +141,28 @@ export function AIAssistantTab() {
     localStorage.setItem(`opora_medical_case_tracker_${profile.id}`, JSON.stringify(medicalCaseTracker));
   }, [medicalCaseTracker, profile.id]);
 
+  const medicalCaseRoute = buildMedicalCaseRoute(profile, 'найти врача который оценит прогрессию');
+  const requiredMedicalDocuments = medicalCaseRoute.documents.filter(item => item.required).slice(0, 5);
+  const compactMedicalTemplates = medicalCaseRoute.templates.map(template => ({
+    ...template,
+    copyText: `${template.bodyRu}\n\n---\n\n${template.bodyEn}`
+  }));
+
   const startMedicalCaseTracker = () => {
-    const route = buildMedicalCaseRoute(profile, 'найти врача который оценит прогрессию');
-    const tracker = buildDefaultMedicalCaseTracker(route, profile.id);
+    const tracker = buildDefaultMedicalCaseTracker(medicalCaseRoute, profile.id);
     setMedicalCaseTracker(tracker);
     setInputValue(medicalNavigatorActions[0].prompt);
+  };
+
+  const copyMedicalTemplate = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMedicalTemplateId(id);
+      window.setTimeout(() => setCopiedMedicalTemplateId(current => current === id ? null : current), 1800);
+    } catch (error) {
+      console.error("Failed to copy medical template:", error);
+      setInputValue(text);
+    }
   };
 
   const updateMedicalCaseItemStatus = (id: string, status: MedicalCaseItemStatus) => {
@@ -343,6 +361,16 @@ export function AIAssistantTab() {
 
           {medicalCaseTracker && medicalCaseProgress ? (
             <div className="space-y-3">
+              <div className="rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2.5">
+                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-rose-600">
+                  <Stethoscope size={13} />
+                  Критическое действие
+                </div>
+                <p className="text-sm font-bold leading-snug text-opora-navy">
+                  {medicalCaseRoute.criticalAction}
+                </p>
+              </div>
+
               <div>
                 <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-opora-text/70">
                   <span>{medicalCaseProgress.doneCount} из {medicalCaseProgress.totalCount} шагов готово</span>
@@ -368,6 +396,79 @@ export function AIAssistantTab() {
                   </p>
                 </div>
               )}
+
+              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                  <FileText size={13} />
+                  Документы для старта
+                </div>
+                <div className="space-y-2">
+                  {requiredMedicalDocuments.map(item => (
+                    <div key={item.id} className="flex gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-opora-sage" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold leading-snug text-opora-navy">{item.title}</p>
+                        <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-opora-text/75">{item.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                  <HandHeart size={13} />
+                  Фонды Казахстана
+                </div>
+                <div className="grid gap-2">
+                  {medicalCaseRoute.foundations.map(item => (
+                    <a
+                      key={item.id}
+                      href={item.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start justify-between gap-2 rounded-lg bg-opora-sand/60 px-2.5 py-2 text-left"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-xs font-extrabold leading-snug text-opora-navy">{item.name}</span>
+                        <span className="mt-0.5 block text-[11px] font-medium leading-relaxed text-opora-text/75">{item.fit}</span>
+                      </span>
+                      <ExternalLink size={13} className="mt-0.5 shrink-0 text-opora-sage" />
+                    </a>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] font-medium leading-relaxed text-opora-text/70">
+                  Правила приема, диагнозы, документы и наличие финансирования нужно проверить на сайте фонда перед подачей.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
+                  <Copy size={13} />
+                  Письма, готовые к копированию
+                </div>
+                <div className="space-y-2">
+                  {compactMedicalTemplates.map(template => (
+                    <div key={template.id} className="rounded-lg bg-opora-sand/60 px-2.5 py-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold leading-snug text-opora-navy">{template.title}</p>
+                          <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-relaxed text-opora-text/75">
+                            {template.bodyRu.split("\n").slice(0, 3).join(" ")}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copyMedicalTemplate(template.id, template.copyText)}
+                          className="shrink-0 rounded-lg bg-white px-2 py-1.5 text-[10px] font-extrabold text-opora-navy shadow-sm active:scale-[0.98]"
+                        >
+                          {copiedMedicalTemplateId === template.id ? 'Скопировано' : 'Копировать'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               <div className="space-y-2">
                 {medicalCaseTracker.items.map(item => (
