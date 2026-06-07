@@ -11,9 +11,11 @@ import {
   Plus,
   Route,
   Salad,
+  ShieldCheck,
   Stethoscope,
   Trash2,
-  Utensils
+  Utensils,
+  Video
 } from 'lucide-react';
 import {
   useProfile,
@@ -27,6 +29,11 @@ import {
   getMedicationEventStatus,
   sortMedicationEventsForDay
 } from '../lib/careTracker';
+import {
+  buildVideoReportPreview,
+  formatVideoReportPreview,
+  type VideoReportType
+} from '../lib/videoReports';
 import {
   buildFamilyCalendarEventsFromSources,
   expandFamilyEventOccurrences,
@@ -43,7 +50,7 @@ import {
   type GovernmentQueueStatus
 } from '../lib/governmentQueueMonitor';
 
-type TrackerView = 'calendar' | 'day' | 'meds' | 'food' | 'queues' | 'report';
+type TrackerView = 'calendar' | 'day' | 'meds' | 'food' | 'queues' | 'report' | 'video';
 type CalendarChildFilter = 'all' | string;
 
 const todayDate = () => new Date().toISOString().slice(0, 10);
@@ -143,6 +150,8 @@ export function CareTrackerTab() {
   const [familyEventNotifyMinutes, setFamilyEventNotifyMinutes] = React.useState('30');
   const [familyEventSaving, setFamilyEventSaving] = React.useState(false);
   const [reportCopied, setReportCopied] = React.useState(false);
+  const [videoReportCopied, setVideoReportCopied] = React.useState(false);
+  const [videoReportType, setVideoReportType] = React.useState<VideoReportType>('doctor');
 
   React.useEffect(() => {
     setSelectedChildId(profile.id);
@@ -237,6 +246,20 @@ export function CareTrackerTab() {
     foodLogs: childFoodLogs,
     reactions: childReactionLogs
   });
+  const videoReportPreview = buildVideoReportPreview({
+    reportType: videoReportType,
+    child: activeChild,
+    periodLabel: 'последние записи в приложении',
+    medications: childPlans,
+    medicationEvents: childMedicationEvents,
+    foodLogs: childFoodLogs,
+    reactions: childReactionLogs,
+    questions: [
+      'Что важно обсудить на следующем приеме?',
+      'Какие наблюдения стоит продолжить фиксировать?'
+    ]
+  });
+  const videoReportText = formatVideoReportPreview(videoReportPreview);
 
   const handleAddPlan = () => {
     if (!planName.trim() || !doseText.trim()) return;
@@ -376,6 +399,16 @@ export function CareTrackerTab() {
     }
   };
 
+  const handleCopyVideoReport = async () => {
+    try {
+      await navigator.clipboard.writeText(videoReportText);
+      setVideoReportCopied(true);
+      window.setTimeout(() => setVideoReportCopied(false), 2500);
+    } catch {
+      setVideoReportCopied(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col pt-12 pb-10">
       <div className="px-5">
@@ -422,7 +455,8 @@ export function CareTrackerTab() {
             { id: 'meds', label: 'Лек.', icon: BellRing },
             { id: 'food', label: 'Еда', icon: Salad },
             { id: 'queues', label: 'Очереди', icon: CalendarCheck },
-            { id: 'report', label: 'Отчет', icon: FileText }
+            { id: 'report', label: 'Отчет', icon: FileText },
+            { id: 'video', label: 'Видео', icon: Video }
           ].map(item => {
             const Icon = item.icon;
             return (
@@ -706,7 +740,7 @@ export function CareTrackerTab() {
                 <FormField label="Интенсивность">
                   <input type="number" min={1} max={5} value={reactionIntensity} onChange={e => setReactionIntensity(clampIntensity(e.target.value))} className={inputClass} />
                 </FormField>
-                <FormField label="Возможная связь">
+                <FormField label="Что было перед этим">
                   <input value={reactionTrigger} onChange={e => setReactionTrigger(e.target.value)} placeholder="новый продукт" className={inputClass} />
                 </FormField>
               </div>
@@ -749,11 +783,84 @@ export function CareTrackerTab() {
                   ))}
                   {childReactionLogs.slice(0, 3).map(log => (
                     <ListCard key={log.id} title={log.title} subtitle={`${formatTime(log.happenedAt)} · ${log.intensity}/5`} onDelete={() => deleteReactionLog(log.id)}>
-                      <p className="text-xs text-opora-text">{log.possibleTrigger || 'Связь не указана'}</p>
+                      <p className="text-xs text-opora-text">{log.possibleTrigger || 'Предыдущее событие не указано'}</p>
                     </ListCard>
                   ))}
                 </div>
               ) : <EmptyState text="Пока нет записей питания или реакций." />}
+            </Panel>
+          </section>
+        )}
+
+        {view === 'video' && (
+          <section className="space-y-4">
+            <Panel title="Видео-отчет" icon={<Video size={18} />}>
+              <p className="mb-3 text-xs leading-relaxed text-opora-text">
+                Предпросмотр показывает сцены будущего ролика. Видео строится только из фактов и не содержит медицинских рекомендаций.
+              </p>
+              <FormField label="Тип видео">
+                <select value={videoReportType} onChange={e => setVideoReportType(e.target.value as VideoReportType)} className={inputClass}>
+                  <option value="doctor">Видео-отчет для врача</option>
+                  <option value="pre_consultation">Видео перед консультацией</option>
+                  <option value="caregiver">Видео для воспитателя/няни</option>
+                </select>
+              </FormField>
+              <div className="mt-3 rounded-2xl border border-opora-sage/15 bg-opora-sand/60 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-extrabold uppercase tracking-wider text-opora-sage">Шаблон</p>
+                    <p className="text-sm font-extrabold text-opora-navy">{getVideoReportTypeLabel(videoReportType)}</p>
+                  </div>
+                  <div className="rounded-xl bg-white px-3 py-2 text-right text-[11px] font-extrabold text-opora-navy">
+                    ~{videoReportPreview.estimatedDurationSeconds} сек
+                  </div>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel title="Безопасность данных" icon={<ShieldCheck size={18} />}>
+              <div className="space-y-2">
+                {videoReportPreview.warnings.map(warning => (
+                  <div key={warning} className="rounded-xl bg-emerald-50 px-3 py-2 text-xs font-bold leading-relaxed text-emerald-800">
+                    {warning}
+                  </div>
+                ))}
+                {videoReportPreview.safetyIssues.length ? (
+                  <div className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold leading-relaxed text-rose-800">
+                    Найдены формулировки, которые нужно исправить перед генерацией: {videoReportPreview.safetyIssues.length}.
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-white px-3 py-2 text-xs font-bold leading-relaxed text-opora-navy">
+                    Запрещенные формулировки не найдены. Перед отправкой все равно проверьте сцены вручную.
+                  </div>
+                )}
+              </div>
+            </Panel>
+
+            <Panel title="Сцены ролика" icon={<ClipboardList size={18} />}>
+              <div className="space-y-3">
+                {videoReportPreview.scenes.map((scene, index) => (
+                  <div key={scene.id} className="rounded-2xl border border-opora-sage/15 bg-white px-4 py-3">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">Сцена {index + 1}</p>
+                        <h3 className="text-sm font-extrabold text-opora-navy">{scene.title}</h3>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-opora-sand px-2.5 py-1 text-[10px] font-extrabold text-opora-navy">
+                        {scene.durationSeconds} сек
+                      </span>
+                    </div>
+                    <ul className="space-y-1">
+                      {scene.lines.map(line => (
+                        <li key={line} className="text-xs leading-relaxed text-opora-text">• {line}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={handleCopyVideoReport} className="mt-3 w-full rounded-2xl bg-opora-navy px-4 py-3 text-sm font-extrabold text-white">
+                {videoReportCopied ? 'Скопировано' : 'Скопировать сценарий'}
+              </button>
             </Panel>
           </section>
         )}
@@ -1016,6 +1123,14 @@ function formatWeekday(value: string) {
 
 function formatAgendaTitle(value: string) {
   return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'long' }).format(new Date(`${value}T00:00:00.000Z`));
+}
+
+function getVideoReportTypeLabel(type: VideoReportType) {
+  return {
+    doctor: 'Видео-отчет для врача',
+    pre_consultation: 'Видео перед консультацией',
+    caregiver: 'Видео для воспитателя/няни'
+  }[type];
 }
 
 function getCalendarWindow(startDate: string) {
