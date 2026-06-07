@@ -39,7 +39,13 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
   const [loadingInstitutions, setLoadingInstitutions] = React.useState(false);
   const [loadingChecklist, setLoadingChecklist] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [progressSyncStatus, setProgressSyncStatus] = React.useState<"idle" | "syncing" | "fallback">("idle");
   const [checkedIds, setCheckedIds] = React.useState<string[]>(() => readChecked(childId, ""));
+  const selectedIdRef = React.useRef(selectedId);
+
+  React.useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -70,7 +76,34 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
   }, [city, kind, query]);
 
   React.useEffect(() => {
-    setCheckedIds(readChecked(childId, selectedId));
+    if (!selectedId) {
+      setCheckedIds([]);
+      setProgressSyncStatus("idle");
+      return;
+    }
+
+    let cancelled = false;
+    const cachedIds = readChecked(childId, selectedId);
+    setCheckedIds(cachedIds);
+    setProgressSyncStatus("syncing");
+
+    const params = new URLSearchParams({ childId });
+    fetch(`/api/institutions/${encodeURIComponent(selectedId)}/checklist-progress?${params.toString()}`)
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("progress_unavailable")))
+      .then(data => {
+        if (cancelled) return;
+        const serverIds = normalizeCheckedIds(data.checkedDocumentIds);
+        setCheckedIds(serverIds);
+        writeChecked(childId, selectedId, serverIds);
+        setProgressSyncStatus("idle");
+      })
+      .catch(() => {
+        if (!cancelled) setProgressSyncStatus("fallback");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [childId, selectedId]);
 
   React.useEffect(() => {
@@ -104,11 +137,33 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
   }, [selectedId, diagnosticStatus, checkedIds]);
 
   const toggleChecked = (documentId: string) => {
+    if (!selectedId) return;
+
+    const institutionId = selectedId;
     const next = checkedIds.includes(documentId)
       ? checkedIds.filter(id => id !== documentId)
       : [...checkedIds, documentId];
     setCheckedIds(next);
-    writeChecked(childId, selectedId, next);
+    writeChecked(childId, institutionId, next);
+    setProgressSyncStatus("syncing");
+
+    fetch(`/api/institutions/${encodeURIComponent(institutionId)}/checklist-progress`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ childId, checkedDocumentIds: next })
+    })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error("progress_save_failed")))
+      .then(data => {
+        const serverIds = normalizeCheckedIds(data.checkedDocumentIds);
+        writeChecked(childId, institutionId, serverIds);
+        if (selectedIdRef.current === institutionId) {
+          setCheckedIds(serverIds);
+          setProgressSyncStatus("idle");
+        }
+      })
+      .catch(() => {
+        if (selectedIdRef.current === institutionId) setProgressSyncStatus("fallback");
+      });
   };
 
   return (
@@ -236,6 +291,11 @@ export function InstitutionGuidePanel({ childId, city, diagnosticStatus, default
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white dark:bg-slate-700">
               <div className="h-full rounded-full bg-opora-sage transition-all" style={{ width: `${checklist.progress.percent}%` }} />
             </div>
+            {progressSyncStatus !== "idle" && (
+              <p className="mt-2 text-[10px] font-bold text-opora-text/55 dark:text-slate-400">
+                {progressSyncStatus === "syncing" ? "Синхронизируем отметки..." : "Сохранили отметки на этом устройстве. Облачная синхронизация временно недоступна."}
+              </p>
+            )}
 
             {loadingChecklist ? (
               <div className="mt-3 flex items-center gap-2 text-xs font-bold text-opora-text/70">
@@ -300,14 +360,23 @@ function storageKey(childId: string, institutionId: string) {
 function readChecked(childId: string, institutionId: string) {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(childId, institutionId)) || "[]");
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+    return normalizeCheckedIds(parsed);
   } catch {
     return [];
   }
 }
 
 function writeChecked(childId: string, institutionId: string, ids: string[]) {
-  localStorage.setItem(storageKey(childId, institutionId), JSON.stringify(ids));
+  try {
+    localStorage.setItem(storageKey(childId, institutionId), JSON.stringify(normalizeCheckedIds(ids)));
+  } catch {
+    // Local fallback is best-effort: private browsing or storage quotas can block it.
+  }
+}
+
+function normalizeCheckedIds(value: unknown) {
+  const items = Array.isArray(value) ? value : [];
+  return [...new Set(items.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map(item => item.trim()))];
 }
 
 function formatDate(value: string) {
