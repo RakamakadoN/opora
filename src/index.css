@@ -790,11 +790,623 @@ select {
   border-color: rgba(122, 215, 200, 0.22) !important;
 }
 
+.opora-home-screen {
+  --home-primary: #7C5CFF;
+  --home-ink: #101A38;
+  --home-muted: #53607A;
+  --home-line: rgba(124, 92, 255, 0.16);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(124, 92, 255, 0.12), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(130, 224, 194, 0.16), transparent 26%),
+    linear-gradient(180deg, #FFFCF8 0%, #F7F3FF 48%, #FBF9F5 100%);
+  color: var(--home-ink);
+}
+
+.opora-home-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.opora-home-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--home-primary);
+  font-size: 1.62rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.opora-home-brand-mark,
+.opora-home-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.opora-home-brand-mark {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 1rem;
+  background: linear-gradient(145deg, #7C5CFF, #9F7BFF);
+  color: #FFFFFF;
+  box-shadow: 0 12px 24px rgba(124, 92, 255, 0.24);
+}
+
+.opora-home-brand-mark svg {
+  fill: currentColor;
+  stroke-width: 2.4;
+}
+
+.opora-home-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+}
+
+.opora-home-action-button {
+  position: relative;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(16, 26, 56, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--home-ink);
+  box-shadow: 0 10px 22px rgba(64, 56, 96, 0.08);
+  backdrop-filter: blur(18px);
+}
+
+.opora-home-action-button span {
+  position: absolute;
+  right: -0.25rem;
+  top: -0.32rem;
+  display: inline-flex;
+  min-width: 1.18rem;
+  height: 1.18rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--home-primary);
+  color: #FFFFFF;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.opora-child-hero {
+  overflow: hidden;
+  border: 1px solid rgba(124, 92, 255, 0.16);
+  border-radius: 32px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.66)),
+    radial-gradient(circle at 8% 12%, rgba(124, 92, 255, 0.10), transparent 36%),
+    radial-gradient(circle at 92% 6%, rgba(189, 166, 255, 0.18), transparent 34%);
+  box-shadow:
+    0 28px 54px rgba(74, 59, 140, 0.13),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  padding: 1.05rem;
+  backdrop-filter: blur(26px);
+}
+
+.opora-child-main {
+  display: grid;
+  grid-template-columns: 7.2rem minmax(0, 1fr);
+  gap: 1.05rem;
+  align-items: center;
+}
+
+.opora-child-photo-wrap {
+  width: 7.2rem;
+  height: 7.2rem;
+  overflow: hidden;
+  border: 7px solid #D8C8FF;
+  border-radius: 999px;
+  background: #FFFFFF;
+  box-shadow: 0 18px 32px rgba(124, 92, 255, 0.18);
+}
+
+.opora-child-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.opora-child-main h1 {
+  margin: 0;
+  color: var(--home-ink);
+  font-size: 1.62rem;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.opora-child-main p {
+  margin: 0.38rem 0 0;
+  color: var(--home-muted);
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.16;
+}
+
+.opora-profile-pill {
+  display: inline-flex;
+  min-height: 2.35rem;
+  align-items: center;
+  gap: 0.42rem;
+  margin-top: 0.85rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7C5CFF, #8D66F3);
+  color: #FFFFFF;
+  padding: 0 0.95rem;
+  font-size: 0.86rem;
+  font-weight: 900;
+  box-shadow: 0 14px 24px rgba(124, 92, 255, 0.24);
+}
+
+.opora-hero-today {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 1.05rem;
+}
+
+.opora-hero-date {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.42rem;
+  justify-self: end;
+  color: var(--home-muted);
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.opora-hero-reminders {
+  display: grid;
+  gap: 0.62rem;
+}
+
+.opora-hero-reminder {
+  display: grid;
+  grid-template-columns: 2.65rem 4.2rem minmax(0, 1fr) 1.7rem;
+  min-height: 3.12rem;
+  align-items: center;
+  gap: 0.56rem;
+  border: 1px solid rgba(124, 92, 255, 0.10);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.64);
+  padding: 0.42rem 0.55rem;
+  color: var(--home-ink);
+  box-shadow: 0 12px 24px rgba(76, 63, 120, 0.06);
+}
+
+.opora-hero-reminder-icon {
+  display: inline-flex;
+  width: 2.35rem;
+  height: 2.35rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(124, 92, 255, 0.12);
+  color: var(--home-primary);
+}
+
+.opora-hero-reminder-time {
+  color: var(--home-muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.opora-hero-reminder-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--home-ink);
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opora-hero-check {
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  border: 2px solid rgba(83, 96, 122, 0.22);
+  border-radius: 999px;
+  color: #58C987;
+}
+
+.opora-hero-check.done {
+  border-color: transparent;
+}
+
+.opora-last-note {
+  display: flex;
+  min-height: 3.35rem;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  border: 1px solid rgba(124, 92, 255, 0.16);
+  border-radius: 19px;
+  background: rgba(245, 239, 255, 0.78);
+  padding: 0.52rem 0.7rem;
+  color: var(--home-ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.opora-last-note-icon {
+  display: inline-flex;
+  width: 2.2rem;
+  height: 2.2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13px;
+  background: rgba(124, 92, 255, 0.12);
+  color: var(--home-primary);
+}
+
+.opora-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.52rem;
+}
+
+.opora-product-card {
+  position: relative;
+  display: flex;
+  height: 9.35rem;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.62rem;
+  text-align: left;
+  box-shadow:
+    0 18px 36px rgba(67, 58, 104, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.90);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+
+.opora-product-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 24% 20%, var(--tone-glow), transparent 44%),
+    linear-gradient(145deg, var(--tone-bg-a), var(--tone-bg-b));
+  opacity: 0.98;
+}
+
+.opora-product-card::after {
+  content: "";
+  position: absolute;
+  right: -1.6rem;
+  top: -1.6rem;
+  width: 5.8rem;
+  height: 5.8rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.36);
+}
+
+.opora-product-card:active {
+  transform: scale(0.985);
+  box-shadow: 0 12px 26px rgba(67, 58, 104, 0.10);
+}
+
+.opora-product-icon,
+.opora-product-copy,
+.opora-product-arrow,
+.opora-product-badge {
+  position: relative;
+  z-index: 1;
+}
+
+.opora-product-icon {
+  display: inline-flex;
+  width: 2.85rem;
+  height: 2.85rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.50);
+  color: var(--tone-icon);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+}
+
+.opora-product-copy {
+  display: block;
+  margin-top: 0.65rem;
+}
+
+.opora-product-copy strong {
+  display: block;
+  color: var(--home-ink);
+  font-size: 0.8rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 1.08;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.opora-product-copy span {
+  display: block;
+  margin-top: 0.34rem;
+  color: #26314C;
+  font-size: 0.61rem;
+  font-weight: 760;
+  line-height: 1.18;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.opora-product-arrow {
+  align-self: flex-end;
+  margin-top: 0.34rem;
+  color: var(--home-ink);
+  stroke-width: 2.7;
+}
+
+.opora-product-badge {
+  position: absolute;
+  right: 0.58rem;
+  top: 0.58rem;
+  display: inline-flex;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--home-primary);
+  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 950;
+  box-shadow: 0 10px 18px rgba(124, 92, 255, 0.23);
+}
+
+.opora-product-card.tone-purple {
+  --tone-icon: #7C5CFF;
+  --tone-glow: rgba(124, 92, 255, 0.19);
+  --tone-bg-a: rgba(252, 249, 255, 0.98);
+  --tone-bg-b: rgba(243, 236, 255, 0.96);
+}
+
+.opora-product-card.tone-mint {
+  --tone-icon: #25A957;
+  --tone-glow: rgba(65, 207, 112, 0.20);
+  --tone-bg-a: rgba(250, 255, 251, 0.98);
+  --tone-bg-b: rgba(236, 252, 241, 0.94);
+}
+
+.opora-product-card.tone-blue {
+  --tone-icon: #4C78E8;
+  --tone-glow: rgba(86, 132, 238, 0.18);
+  --tone-bg-a: rgba(249, 252, 255, 0.98);
+  --tone-bg-b: rgba(235, 244, 255, 0.94);
+}
+
+.opora-product-card.tone-amber {
+  --tone-icon: #E8872D;
+  --tone-glow: rgba(255, 179, 87, 0.22);
+  --tone-bg-a: rgba(255, 252, 247, 0.98);
+  --tone-bg-b: rgba(255, 244, 224, 0.94);
+}
+
+.opora-product-card.tone-rose {
+  --tone-icon: #D94385;
+  --tone-glow: rgba(229, 89, 149, 0.19);
+  --tone-bg-a: rgba(255, 250, 253, 0.98);
+  --tone-bg-b: rgba(255, 236, 245, 0.94);
+}
+
+.opora-product-card.tone-teal {
+  --tone-icon: #1FB7A6;
+  --tone-glow: rgba(41, 207, 191, 0.18);
+  --tone-bg-a: rgba(249, 255, 254, 0.98);
+  --tone-bg-b: rgba(232, 251, 249, 0.94);
+}
+
+.opora-product-card.tone-indigo {
+  --tone-icon: #4C68E8;
+  --tone-glow: rgba(90, 113, 238, 0.18);
+  --tone-bg-a: rgba(250, 251, 255, 0.98);
+  --tone-bg-b: rgba(236, 240, 255, 0.94);
+}
+
+.opora-product-card.tone-orange {
+  --tone-icon: #E99A2A;
+  --tone-glow: rgba(242, 172, 58, 0.21);
+  --tone-bg-a: rgba(255, 253, 248, 0.98);
+  --tone-bg-b: rgba(255, 246, 228, 0.94);
+}
+
+.opora-product-card.tone-green {
+  --tone-icon: #32A84F;
+  --tone-glow: rgba(81, 202, 102, 0.18);
+  --tone-bg-a: rgba(250, 255, 251, 0.98);
+  --tone-bg-b: rgba(238, 252, 239, 0.94);
+}
+
+.opora-product-card.tone-coral {
+  --tone-icon: #E85D64;
+  --tone-glow: rgba(238, 99, 106, 0.18);
+  --tone-bg-a: rgba(255, 251, 250, 0.98);
+  --tone-bg-b: rgba(255, 239, 236, 0.94);
+}
+
+.opora-product-card.tone-red {
+  --tone-icon: #E23D55;
+  --tone-glow: rgba(239, 75, 96, 0.18);
+  --tone-bg-a: rgba(255, 250, 251, 0.98);
+  --tone-bg-b: rgba(255, 236, 240, 0.94);
+}
+
+@media (max-width: 380px) {
+  .opora-child-main {
+    grid-template-columns: 6.4rem minmax(0, 1fr);
+  }
+
+  .opora-child-photo-wrap {
+    width: 6.4rem;
+    height: 6.4rem;
+  }
+}
+
+.opora-home-hero {
+  position: relative;
+  min-height: 14.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(18, 48, 58, 0.08);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 225, 214, 0.95) 0, rgba(255, 225, 214, 0.36) 28%, transparent 52%),
+    linear-gradient(135deg, #FFFFFF 0%, #F5FBF8 54%, #E8F4EF 100%);
+  box-shadow: 0 18px 42px rgba(18, 48, 58, 0.10);
+  padding: 1.15rem;
+}
+
+.opora-home-kicker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.8rem;
+  border-radius: 999px;
+  background: rgba(0, 124, 112, 0.10);
+  padding: 0 0.7rem;
+  color: var(--opora-sage);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.opora-hero-illustration {
+  position: absolute;
+  right: -0.85rem;
+  top: 0.85rem;
+  width: 11.5rem;
+  height: 10.2rem;
+  pointer-events: none;
+}
+
+.opora-hero-sun {
+  position: absolute;
+  right: 2rem;
+  top: 0.25rem;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 999px;
+  background: #FFD8A8;
+  box-shadow: inset -12px -10px 0 rgba(236, 166, 96, 0.24);
+}
+
+.opora-hero-card {
+  position: absolute;
+  border: 1px solid rgba(18, 48, 58, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 12px 26px rgba(18, 48, 58, 0.10);
+}
+
+.opora-hero-card.one {
+  right: 5.6rem;
+  top: 5.4rem;
+  width: 4.4rem;
+  height: 3rem;
+  transform: rotate(-8deg);
+}
+
+.opora-hero-card.two {
+  right: 1.25rem;
+  top: 4.7rem;
+  width: 5rem;
+  height: 3.4rem;
+  transform: rotate(7deg);
+}
+
+.opora-hero-face {
+  position: absolute;
+  right: 3.7rem;
+  top: 2.95rem;
+  width: 4.7rem;
+  height: 4.7rem;
+  border: 7px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  background: #007C70;
+  box-shadow: 0 18px 34px rgba(0, 124, 112, 0.22);
+}
+
+.opora-hero-face::before,
+.opora-hero-face::after {
+  content: "";
+  position: absolute;
+  top: 1.45rem;
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: #FFFFFF;
+}
+
+.opora-hero-face::before {
+  left: 1.25rem;
+}
+
+.opora-hero-face::after {
+  right: 1.25rem;
+}
+
+.opora-hero-face span {
+  position: absolute;
+  left: 1.35rem;
+  bottom: 1.15rem;
+  width: 1.35rem;
+  height: 0.7rem;
+  border-bottom: 3px solid #FFFFFF;
+  border-radius: 0 0 999px 999px;
+}
+
+.opora-home-hero-metrics {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 1rem;
+  max-width: 13.5rem;
+}
+
+.opora-home-metric {
+  min-width: 0;
+  border: 1px solid rgba(0, 124, 112, 0.13);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 0.55rem 0.65rem;
+  box-shadow: 0 8px 18px rgba(18, 48, 58, 0.06);
+}
+
+.opora-soft-panel {
+  border: 1px solid var(--opora-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(18, 48, 58, 0.07);
+}
+
 .opora-home-bento {
   position: relative;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   overflow: hidden;
   border-radius: 16px !important;
   border: 1px solid var(--opora-line);
@@ -814,8 +1426,27 @@ select {
 
 .opora-home-bento-primary {
   background:
-    linear-gradient(135deg, rgba(18, 48, 58, 0.96), rgba(0, 124, 112, 0.92)),
+    radial-gradient(circle at 82% 14%, rgba(255, 216, 168, 0.64) 0, transparent 36%),
+    linear-gradient(135deg, rgba(18, 48, 58, 0.98), rgba(0, 124, 112, 0.92)),
     #12303A;
+}
+
+.opora-home-bento-calm {
+  background:
+    radial-gradient(circle at 80% 20%, rgba(255, 225, 214, 0.78), transparent 45%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 242, 0.95));
+}
+
+.opora-home-bento-people {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(0, 124, 112, 0.18), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(240, 249, 246, 0.96));
+}
+
+.opora-home-bento-chat {
+  background:
+    radial-gradient(circle at 78% 20%, rgba(123, 178, 234, 0.22), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(243, 247, 255, 0.96));
 }
 
 .opora-home-bento-alert {
@@ -852,6 +1483,205 @@ select {
   background: rgba(255, 255, 255, 0.55);
 }
 
+.opora-bento-art {
+  position: absolute;
+  right: 0.55rem;
+  top: 0.55rem;
+  width: 5.5rem;
+  height: 5.2rem;
+  pointer-events: none;
+}
+
+.opora-bento-art-schedule {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.opora-bento-art-schedule::before {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  top: 0.72rem;
+  width: 3.85rem;
+  height: 3.85rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.90);
+  box-shadow: 0 12px 20px rgba(0, 0, 0, 0.12);
+}
+
+.opora-bento-art-schedule .tile {
+  position: absolute;
+  z-index: 1;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #007C70;
+}
+
+.opora-bento-art-schedule .tile.one {
+  left: 1.35rem;
+  top: 1.55rem;
+  width: 2.35rem;
+}
+
+.opora-bento-art-schedule .tile.two {
+  left: 1.35rem;
+  top: 2.45rem;
+  width: 1.7rem;
+  background: #FFD8A8;
+}
+
+.opora-bento-art-schedule .tile.three {
+  left: 1.35rem;
+  top: 3.35rem;
+  width: 2.65rem;
+  background: #DDEBE7;
+}
+
+.opora-bento-art-calm {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.opora-bento-art-calm .wave {
+  position: absolute;
+  border: 2px solid rgba(0, 124, 112, 0.30);
+  border-radius: 999px;
+}
+
+.opora-bento-art-calm .wave.one {
+  inset: 0.55rem;
+}
+
+.opora-bento-art-calm .wave.two {
+  inset: 1.35rem;
+  border-color: rgba(255, 151, 121, 0.40);
+}
+
+.opora-bento-art-calm .dot {
+  position: absolute;
+  left: 2.28rem;
+  top: 2.1rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: #007C70;
+}
+
+.opora-bento-art-people .avatar {
+  position: absolute;
+  border: 4px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  box-shadow: 0 10px 18px rgba(18, 48, 58, 0.12);
+}
+
+.opora-bento-art-people .avatar.one {
+  right: 1.9rem;
+  top: 0.45rem;
+  width: 2.55rem;
+  height: 2.55rem;
+  background: #007C70;
+}
+
+.opora-bento-art-people .avatar.two {
+  right: 0.7rem;
+  top: 1.95rem;
+  width: 2.3rem;
+  height: 2.3rem;
+  background: #FFD8A8;
+}
+
+.opora-bento-art-people .path {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 0.45rem;
+  width: 3.6rem;
+  height: 1.15rem;
+  border-bottom: 3px solid rgba(0, 124, 112, 0.22);
+  border-radius: 999px;
+}
+
+.opora-bento-art-chat .bubble {
+  position: absolute;
+  border-radius: 18px;
+  box-shadow: 0 12px 18px rgba(18, 48, 58, 0.10);
+}
+
+.opora-bento-art-chat .bubble.big {
+  right: 0.6rem;
+  top: 0.55rem;
+  width: 4.2rem;
+  height: 2.65rem;
+  background: #FFFFFF;
+}
+
+.opora-bento-art-chat .bubble.big::before,
+.opora-bento-art-chat .bubble.big::after {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: rgba(0, 124, 112, 0.30);
+}
+
+.opora-bento-art-chat .bubble.big::before {
+  top: 0.72rem;
+  width: 2.5rem;
+}
+
+.opora-bento-art-chat .bubble.big::after {
+  top: 1.45rem;
+  width: 1.65rem;
+}
+
+.opora-bento-art-chat .bubble.small {
+  right: 2.9rem;
+  top: 2.95rem;
+  width: 2.25rem;
+  height: 1.65rem;
+  background: #007C70;
+}
+
+.opora-document-strip,
+.opora-parent-wisdom {
+  min-width: 0;
+  border: 1px solid var(--opora-line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 0.82rem 0.9rem;
+  box-shadow: 0 8px 22px rgba(18, 48, 58, 0.06);
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.opora-document-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.opora-document-strip:active,
+.opora-parent-wisdom:active {
+  transform: scale(0.99);
+}
+
+.opora-document-icon {
+  display: inline-flex;
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(0, 124, 112, 0.10);
+  color: var(--opora-sage);
+}
+
+.opora-parent-wisdom {
+  border-style: dashed;
+  border-color: rgba(0, 124, 112, 0.24);
+}
+
 .dark .opora-home-bento {
   background: rgba(23, 35, 44, 0.98);
   border-color: rgba(255, 255, 255, 0.11);
@@ -860,8 +1690,29 @@ select {
 
 .dark .opora-home-bento-primary {
   background:
+    radial-gradient(circle at 82% 14%, rgba(255, 216, 168, 0.24) 0, transparent 36%),
     linear-gradient(135deg, rgba(13, 44, 49, 0.98), rgba(0, 96, 88, 0.92)),
     #0D2C31;
+}
+
+.dark .opora-home-hero,
+.dark .opora-soft-panel,
+.dark .opora-document-strip,
+.dark .opora-parent-wisdom {
+  background: rgba(23, 35, 44, 0.98);
+  border-color: rgba(255, 255, 255, 0.11);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.dark .opora-home-bento-calm,
+.dark .opora-home-bento-people,
+.dark .opora-home-bento-chat {
+  background: rgba(23, 35, 44, 0.98);
+}
+
+.dark .opora-home-metric {
+  background: rgba(16, 24, 32, 0.76);
+  border-color: rgba(255, 255, 255, 0.10);
 }
 
 .dark .opora-home-bento-alert {

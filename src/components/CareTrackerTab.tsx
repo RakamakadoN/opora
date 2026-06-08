@@ -50,7 +50,7 @@ import {
   type GovernmentQueueStatus
 } from '../lib/governmentQueueMonitor';
 
-type TrackerView = 'calendar' | 'day' | 'meds' | 'food' | 'queues' | 'report' | 'video';
+export type TrackerView = 'calendar' | 'day' | 'meds' | 'food' | 'queues' | 'report' | 'video';
 type CalendarChildFilter = 'all' | string;
 
 const todayDate = () => new Date().toISOString().slice(0, 10);
@@ -83,7 +83,7 @@ const childColorClasses: Record<string, { dot: string; badge: string; line: stri
   indigo: { dot: 'bg-indigo-500', badge: 'bg-indigo-50 text-indigo-700 border-indigo-100', line: 'border-l-indigo-400', marker: 'bg-indigo-400' }
 };
 
-export function CareTrackerTab() {
+export function CareTrackerTab({ initialView = 'calendar' }: { initialView?: TrackerView }) {
   const {
     profile,
     profiles,
@@ -152,6 +152,10 @@ export function CareTrackerTab() {
   const [reportCopied, setReportCopied] = React.useState(false);
   const [videoReportCopied, setVideoReportCopied] = React.useState(false);
   const [videoReportType, setVideoReportType] = React.useState<VideoReportType>('doctor');
+
+  React.useEffect(() => {
+    setView(initialView);
+  }, [initialView]);
 
   React.useEffect(() => {
     setSelectedChildId(profile.id);

@@ -8,7 +8,7 @@ import { Onboarding } from './components/Onboarding';
 import { ProfileTab } from './components/ProfileTab';
 import { CommunityTab } from './components/CommunityTab';
 import { DoctorCabinetTab } from './components/DoctorCabinetTab';
-import { CareTrackerTab } from './components/CareTrackerTab';
+import { CareTrackerTab, type TrackerView } from './components/CareTrackerTab';
 import { ProfileProvider, useProfile } from './context/ProfileContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
@@ -19,6 +19,7 @@ type DirectoryQuickFilter = 'recommendations' | undefined;
 function AppContent() {
   const { hasSeenOnboarding, appRole, setAppRole } = useProfile();
   const [activeTab, setActiveTab] = useState<TabType>('navigator');
+  const [trackerInitialView, setTrackerInitialView] = useState<TrackerView>('calendar');
   const [directoryQuickFilter, setDirectoryQuickFilter] = useState<DirectoryQuickFilter>(undefined);
 
   React.useEffect(() => {
@@ -59,12 +60,16 @@ function AppContent() {
               setDirectoryQuickFilter('recommendations');
               setActiveTab('directory');
             }}
+            onOpenTrackerView={(view) => {
+              setTrackerInitialView(view);
+              setActiveTab('tracker');
+            }}
           />
         );
       case 'ai':
         return <AIAssistantTab />;
       case 'tracker':
-        return <CareTrackerTab />;
+        return <CareTrackerTab initialView={trackerInitialView} />;
       case 'directory':
         return <DirectoryTab initialFilter={directoryQuickFilter} />;
       case 'profile':
@@ -80,7 +85,7 @@ function AppContent() {
     <div className="flex min-h-screen items-center justify-center p-0 sm:p-4">
       <div className="opora-device-frame opora-shell opora-mobile-shell relative flex w-full max-w-none flex-col overflow-hidden font-sans sm:h-[844px] sm:max-w-[410px] sm:rounded-[2rem] sm:border sm:border-white/70">
         <main className="opora-shell-main relative z-10 min-w-0 flex-1 overflow-y-auto scroll-smooth">
-          <div className="opora-role-switcher flex justify-end px-4 pt-3">
+          <div className={`opora-role-switcher px-4 pt-3 ${appRole === 'parent' && activeTab === 'navigator' ? 'hidden' : 'flex justify-end'}`}>
             <div className="flex max-w-full flex-wrap justify-end gap-1 rounded-2xl border border-black/5 bg-white/80 p-1 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
             {[
               { id: 'parent', label: 'Я родитель' },

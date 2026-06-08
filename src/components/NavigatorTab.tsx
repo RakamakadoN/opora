@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, CheckCircle2, Circle, ArrowRight, BookOpen, Quote, Bookmark, X, Sparkles, ClipboardCheck, FileText, Info, Bell, BellRing, Settings2, Clock, Volume2, Heart, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, Printer, Share2, ShieldAlert, VolumeX, Phone, Activity, Smile, Send } from 'lucide-react';
+import { MapPin, CheckCircle2, Circle, ArrowRight, BookOpen, Quote, Bookmark, X, Sparkles, ClipboardCheck, FileText, Info, Bell, BellRing, Settings2, Clock, Volume2, Heart, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, Printer, Share2, ShieldAlert, VolumeX, Phone, Activity, Smile, Send, Pill, Salad, NotebookPen, BrainCircuit, Siren, UsersRound, Stethoscope, Video, Route, UserRound, CalendarDays } from 'lucide-react';
 import { useProfile, ARTICLES_DATABASE, DiagnosticStatus, type MessageTemplate, type ParentTask, type VisitCardDraft } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
 import { SciencePulse } from './SciencePulse';
@@ -15,7 +15,10 @@ import {
   type BureaucracyDeadline
 } from '../lib/disabilityBureaucracy';
 import { InstitutionGuidePanel } from './InstitutionGuidePanel';
+import type { TrackerView } from './CareTrackerTab';
 
+type NavigatorCategory = 'all' | 'schedule' | 'pmpk' | 'route' | 'science' | 'friendly' | 'podcasts';
+type HomeBentoTone = 'purple' | 'mint' | 'blue' | 'amber' | 'rose' | 'teal' | 'indigo' | 'orange' | 'green' | 'coral' | 'red';
 
 const STAGES = [
   { 
@@ -286,10 +289,12 @@ const CRISIS_GUIDELINES = [
 
 export function NavigatorTab({
   onChangeTab,
-  onOpenDirectoryRecommendations
+  onOpenDirectoryRecommendations,
+  onOpenTrackerView
 }: {
   onChangeTab?: (tab: 'navigator' | 'ai' | 'directory' | 'community' | 'profile' | 'doctor') => void;
   onOpenDirectoryRecommendations?: () => void;
+  onOpenTrackerView?: (view: TrackerView) => void;
 }) {
   const { 
     profile, 
@@ -319,7 +324,7 @@ export function NavigatorTab({
   } = useProfile();
   const [selectedArticleId, setSelectedArticleId] = useState<string | null>(null);
   const [celebratedStage, setCelebratedStage] = useState<{ id: number; title: string } | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'all' | 'schedule' | 'pmpk' | 'route' | 'science' | 'friendly' | 'podcasts'>('all');
+  const [activeCategory, setActiveCategory] = useState<NavigatorCategory>('all');
   const [activeVisitCard, setActiveVisitCard] = useState<VisitCardDraft | null>(null);
   const [activeTemplate, setActiveTemplate] = useState<MessageTemplate | null>(null);
   const [templatePreview, setTemplatePreview] = useState('');
@@ -348,6 +353,8 @@ export function NavigatorTab({
   const audioContextRef = React.useRef<AudioContext | null>(null);
   const audioSourceRef = React.useRef<any>(null);
   const podcastAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const activeCategoryRef = React.useRef<HTMLDivElement | null>(null);
+  const shouldScrollToCategoryRef = React.useRef(false);
   const [crisisQuery, setCrisisQuery] = useState('');
   const [crisisAiReply, setCrisisAiReply] = useState('');
   const [isCrisisAiTyping, setIsCrisisAiTyping] = useState(false);
@@ -1327,6 +1334,86 @@ export function NavigatorTab({
           ? 'Выберите следующий шаг в Казахстане'
           : 'Вы готовы к спокойному разговору со специалистом';
 
+  const scrollToActiveCategory = React.useCallback(() => {
+    requestAnimationFrame(() => {
+      activeCategoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
+  const openCategory = (category: Exclude<NavigatorCategory, 'all'>) => {
+    shouldScrollToCategoryRef.current = true;
+    setActiveCategory(category);
+    if (activeCategory === category) {
+      scrollToActiveCategory();
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeCategory === 'all' || !shouldScrollToCategoryRef.current) return;
+    shouldScrollToCategoryRef.current = false;
+    scrollToActiveCategory();
+  }, [activeCategory, scrollToActiveCategory]);
+
+  const openTrackerView = (view: TrackerView) => {
+    if (onOpenTrackerView) {
+      onOpenTrackerView(view);
+      return;
+    }
+    onChangeTab?.('tracker' as any);
+  };
+
+  const childAgeLabel = `${profile.childAge} ${profile.childAge === 1 ? 'год' : profile.childAge > 1 && profile.childAge < 5 ? 'года' : 'лет'}`;
+  const latestHomeNote = childDiaryEntries[0]?.content || latestSuccess?.title || latestRoutine?.title || 'Сегодня можно записать одно наблюдение без спешки.';
+  const nextBookingTime = upcomingBooking?.date
+    ? new Date(upcomingBooking.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
+    : 'по готовности';
+  const homeReminderRows = [
+    {
+      id: 'step',
+      icon: Sparkles,
+      time: 'сегодня',
+      title: nextBestAction,
+      done: specialistReadyPercent >= 80
+    },
+    {
+      id: 'docs',
+      icon: FileText,
+      time: bureaucracyNearestDeadline ? bureaucracyNearestDeadline.date : 'документы',
+      title: bureaucracyNearestDeadline ? bureaucracyNearestDeadline.title : `${bureaucracyProgress.checkedCount}/${bureaucracyProgress.totalCount} готово`,
+      done: bureaucracyProgress.percent >= 100
+    },
+    {
+      id: 'visit',
+      icon: CalendarDays,
+      time: nextBookingTime,
+      title: upcomingBooking ? `Прием: ${upcomingBooking.doctorName}` : 'Следующее напоминание',
+      done: false
+    }
+  ];
+  const homeBentoCards: Array<{
+    id: string;
+    title: string;
+    desc: string;
+    icon: React.ElementType;
+    tone: HomeBentoTone;
+    badge?: string;
+    size?: 'wide' | 'tall';
+    action: () => void;
+  }> = [
+    { id: 'meds', title: 'Лекарства', desc: 'Расписание, прием, напоминания', icon: Pill, tone: 'purple', badge: '2', size: 'tall', action: () => openTrackerView('meds') },
+    { id: 'food', title: 'Питание', desc: 'Рацион, реакции, ограничения', icon: Salad, tone: 'mint', action: () => openTrackerView('food') },
+    { id: 'diary', title: 'Дневник', desc: 'Поведение, настроение, заметки', icon: NotebookPen, tone: 'blue', action: () => openTrackerView('day') },
+    { id: 'diagnostics', title: 'Диагностика', desc: 'ПМПК, анализы, документы', icon: Stethoscope, tone: 'amber', action: () => openCategory('pmpk') },
+    { id: 'video', title: 'Видео-анализ', desc: 'Загрузить видео, получить оценку', icon: Video, tone: 'rose', action: () => openTrackerView('video') },
+    { id: 'tests', title: 'Тесты', desc: 'M-CHAT, скрининги, опросники', icon: ClipboardCheck, tone: 'teal', action: () => completeSoftScreening() },
+    { id: 'specialists', title: 'Специалисты', desc: 'Врачи, логопеды, ABA, психологи', icon: UsersRound, tone: 'indigo', action: () => onChangeTab?.('directory') },
+    { id: 'route', title: 'Маршрут помощи', desc: 'Что делать дальше, следующий шаг', icon: Route, tone: 'orange', action: () => openCategory('route') },
+    { id: 'reports', title: 'Отчеты', desc: 'Для врача, PDF, видео-отчет', icon: FileText, tone: 'purple', action: () => openTrackerView('report') },
+    { id: 'knowledge', title: 'База знаний', desc: 'Статьи, видео, рекомендации', icon: BookOpen, tone: 'green', action: () => openCategory('science') },
+    { id: 'support', title: 'Поддержка', desc: 'Сообщество, полезные контакты', icon: Heart, tone: 'coral', action: () => onChangeTab?.('community') },
+    { id: 'emergency', title: 'Экстренная информация', desc: 'Аллергии, лекарства, контакты', icon: Siren, tone: 'red', action: () => setStateMode('panic') }
+  ];
+
   // Segmented State control handler and visual renders
   const BREATH_PHASES = [
     { text: 'Вдох...', scale: 1.4, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
@@ -1850,47 +1937,103 @@ export function NavigatorTab({
   }
 
   return (
-    <div className="h-full flex flex-col pt-12">
-      <div className="px-6 mb-6">
-        <span className="text-xs font-bold text-opora-sage uppercase tracking-wider">Опора сегодня</span>
-        <h1 className="font-serif text-3xl font-medium text-opora-navy mb-1">Маршрут {profile.childName}</h1>
-        <p className="text-opora-text text-base">Выберите один понятный шаг. Остальное не обязательно читать сейчас.</p>
+    <div className="opora-home-screen min-h-full pb-6 pt-7">
+      <div className="opora-home-topbar px-6">
+        <div className="opora-home-brand">
+          <span className="opora-home-brand-mark">
+            <Heart size={22} />
+          </span>
+          <span>опора</span>
+        </div>
+        <div className="opora-home-actions">
+          <button type="button" className="opora-home-action-button" aria-label="Уведомления">
+            <Bell size={21} />
+            <span>3</span>
+          </button>
+          <button type="button" onClick={() => onChangeTab?.('profile')} className="opora-home-action-button" aria-label="Профиль">
+            <UserRound size={22} />
+          </button>
+        </div>
       </div>
 
-      <div className="px-6 mb-6">
-        <button
-          type="button"
-          onClick={() => setNavigatorSubscreen('bureaucracy')}
-          className="w-full rounded-2xl border border-black/5 bg-white p-5 text-left shadow-sm transition active:scale-[0.99]"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="rounded-xl bg-opora-sage/10 p-2 text-opora-sage">
-                <FileText size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-opora-sage">МСЭ и документы</p>
-                <h3 className="mt-1 font-serif text-[18px] font-bold leading-tight text-opora-navy">Бюрократический помощник</h3>
-                <p className="mt-1 text-xs leading-relaxed text-opora-text">
-                  {bureaucracyNearestDeadline
-                    ? `Ближайший срок: ${bureaucracyNearestDeadline.title}, ${bureaucracyNearestDeadline.date}`
-                    : 'Соберите документы, сроки и этапы в одном месте.'}
-                </p>
-              </div>
-            </div>
-            <ArrowRight size={18} className="mt-1 shrink-0 text-opora-text/50" />
+      <section className="opora-child-hero mx-5 mt-5">
+        <div className="opora-child-main">
+          <div className="opora-child-photo-wrap">
+            <img src="/opora-child-avatar.png" alt="" className="opora-child-photo" />
           </div>
-          <div className="mt-4">
-            <div className="mb-1 flex justify-between text-[11px] font-bold text-opora-text">
-              <span>Готовность</span>
-              <span>{bureaucracyProgress.checkedCount} из {bureaucracyProgress.totalCount}</span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-opora-sand">
-              <motion.div className="h-full rounded-full bg-opora-sage" style={{ width: `${bureaucracyProgress.percent}%` }} />
-            </div>
+          <div className="min-w-0">
+            <h1>{profile.childName}</h1>
+            <p>{childAgeLabel}</p>
+            <p>{profile.diagnosticStatus}</p>
+            <button type="button" onClick={() => onChangeTab?.('profile')} className="opora-profile-pill">
+              <UserRound size={15} />
+              Профиль
+            </button>
           </div>
+        </div>
+
+        <div className="opora-hero-today">
+          <div className="opora-hero-date">
+            <CalendarDays size={16} />
+            <span>Сегодня</span>
+          </div>
+          <div className="opora-hero-reminders">
+            {homeReminderRows.map(row => {
+              const RowIcon = row.icon;
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  onClick={row.id === 'docs' ? () => setNavigatorSubscreen('bureaucracy') : row.id === 'step' ? completeSoftScreening : undefined}
+                  className="opora-hero-reminder"
+                >
+                  <span className="opora-hero-reminder-icon">
+                    <RowIcon size={19} />
+                  </span>
+                  <span className="opora-hero-reminder-time">{row.time}</span>
+                  <span className="opora-hero-reminder-title">{row.title}</span>
+                  <span className={cn('opora-hero-check', row.done && 'done')}>
+                    {row.done && <CheckCircle2 size={16} />}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <button type="button" onClick={openTrackerView.bind(null, 'day')} className="opora-last-note">
+          <span className="opora-last-note-icon">
+            <NotebookPen size={18} />
+          </span>
+          <span className="min-w-0 flex-1 truncate">Последняя запись: {latestHomeNote}</span>
+          <span className="shrink-0 text-opora-text/70">10:15</span>
+          <ChevronRight size={16} className="shrink-0" />
         </button>
-      </div>
+      </section>
+
+      <section className="opora-product-grid px-5 pt-5">
+        {homeBentoCards.map(card => {
+          const CardIcon = card.icon;
+          return (
+          <button
+            key={card.id}
+            type="button"
+            onClick={card.action}
+            className={cn('opora-product-card', `tone-${card.tone}`, card.size === 'wide' && 'wide', card.size === 'tall' && 'tall')}
+          >
+            <span className="opora-product-icon">
+              <CardIcon size={31} />
+            </span>
+            {card.badge && <span className="opora-product-badge">{card.badge}</span>}
+            <span className="opora-product-copy">
+              <strong>{card.title}</strong>
+              <span>{card.desc}</span>
+            </span>
+            <ChevronRight size={19} className="opora-product-arrow" />
+          </button>
+          );
+        })}
+      </section>
 
       {pendingDoctorAccessConfirmation && (
         <div className="px-6 mb-5">
@@ -1922,198 +2065,9 @@ export function NavigatorTab({
         </div>
       )}
 
-      <div className="px-6 mb-5">
-        <div className="rounded-3xl border border-black/5 bg-white/95 p-4 shadow-sm dark:border-white/10 dark:bg-slate-800/95">
-          <div className="mb-4 flex items-start justify-between gap-3">
-            <div>
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">Сегодня один шаг</p>
-              <h2 className="mt-1 text-xl font-extrabold leading-tight text-opora-navy dark:text-slate-50">{nextBestAction}</h2>
-              <p className="mt-2 text-xs leading-relaxed text-opora-text dark:text-slate-300">
-                Опора не ставит диагноз. Она помогает спокойно собрать факты для специалиста и не потеряться в маршруте.
-              </p>
-            </div>
-            <div className="shrink-0 rounded-2xl bg-opora-sage/10 px-3 py-2 text-center">
-              <p className="text-lg font-extrabold text-opora-navy dark:text-slate-50">{specialistReadyPercent}%</p>
-              <p className="text-[9px] font-bold uppercase tracking-wide text-opora-sage">готово</p>
-            </div>
-          </div>
-
-          <div className="mb-4 h-2 overflow-hidden rounded-full bg-opora-sand dark:bg-slate-900">
-            <div className="h-full rounded-full bg-opora-sage transition-all" style={{ width: `${specialistReadyPercent}%` }} />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={completeSoftScreening}
-              className="rounded-2xl bg-opora-navy px-4 py-3 text-sm font-extrabold text-white"
-            >
-              Пройти скрининг
-            </button>
-            <button
-              type="button"
-              onClick={openVisitCard}
-              className="rounded-2xl bg-opora-sand px-4 py-3 text-sm font-extrabold text-opora-navy dark:bg-slate-900 dark:text-slate-100"
-            >
-              Отчет врачу
-            </button>
-          </div>
-
-          <details className="mt-3 rounded-2xl bg-opora-sand/45 p-3 dark:bg-slate-900/70">
-            <summary className="cursor-pointer text-xs font-extrabold text-opora-navy dark:text-slate-100">
-              Что уже собрано для специалиста
-            </summary>
-            <div className="mt-3 grid grid-cols-1 gap-2">
-              {specialistReadySteps.map(step => (
-                <div key={step.id} className="flex items-center justify-between gap-3 rounded-xl bg-white/75 px-3 py-2 dark:bg-slate-800">
-                  <span className="flex items-center gap-2 text-xs font-bold text-opora-navy dark:text-slate-100">
-                    {step.done ? <CheckCircle2 size={15} className="text-opora-sage" /> : <Circle size={15} className="text-opora-text/45" />}
-                    {step.label}
-                  </span>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wide text-opora-text/65 dark:text-slate-400">{step.action}</span>
-                </div>
-              ))}
-            </div>
-          </details>
-        </div>
-      </div>
-
-      <div className="px-6 mb-5">
-        <div className="rounded-3xl border border-black/5 bg-white/95 p-4 shadow-sm dark:border-white/10 dark:bg-slate-800/95">
-          <div className="mb-3">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">Дневник на 60 секунд</p>
-            <h2 className="mt-1 text-lg font-extrabold leading-tight text-opora-navy dark:text-slate-50">Записать один факт</h2>
-          </div>
-
-          <div className="mb-3 grid grid-cols-4 gap-1 rounded-2xl bg-opora-sand/70 p-1 dark:bg-slate-900">
-            {[
-              { id: 'note', label: 'Факт' },
-              { id: 'success', label: 'Успех' },
-              { id: 'trigger', label: 'Триггер' },
-              { id: 'routine', label: 'Рутина' }
-            ].map(item => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setQuickObservationType(item.id as typeof quickObservationType)}
-                className={`rounded-xl px-2 py-2 text-[11px] font-extrabold transition-all ${
-                  quickObservationType === item.id ? 'bg-opora-navy text-white' : 'text-opora-navy dark:text-slate-200'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-
-          <textarea
-            value={quickObservationNote}
-            onChange={event => setQuickObservationNote(event.target.value)}
-            placeholder="Например: откликнулся на имя; закрыл уши в магазине; уснул быстрее после тихой рутины..."
-            className="min-h-[76px] w-full resize-none rounded-2xl border border-black/5 bg-opora-sand/45 px-3 py-3 text-sm font-medium text-opora-navy outline-none placeholder:text-opora-text/45 dark:border-white/10 dark:bg-slate-900 dark:text-slate-100"
-          />
-          <button
-            type="button"
-            onClick={saveQuickObservation}
-            className="mt-3 w-full rounded-2xl bg-opora-sage px-4 py-3 text-sm font-extrabold text-white"
-          >
-            Добавить наблюдение
-          </button>
-        </div>
-      </div>
-
-      <div className="px-6 mb-5">
-        <div className="mb-3">
-          <h2 className="text-lg font-extrabold text-opora-navy leading-tight dark:text-slate-50">Центр действий</h2>
-          <p className="mt-1 text-xs text-opora-text dark:text-slate-300">Четыре понятных направления вместо длинной ленты.</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setActiveCategory('schedule')}
-            className="opora-home-bento min-h-[116px] p-3.5 text-left dark:border-white/10 dark:bg-slate-800"
-          >
-            <span className="opora-home-picture small">📅</span>
-            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">План дня</span>
-            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">
-              {todayPlanned.length ? `${completedTodayCount}/${todayPlanned.length} занятий` : 'Без срочных задач'}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onChangeTab?.('directory')}
-            className="opora-home-bento min-h-[116px] p-3.5 text-left dark:border-white/10 dark:bg-slate-800"
-          >
-            <span className="opora-home-picture small">🤝</span>
-            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">База доверия</span>
-            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">Опыт родителей о местах и специалистах.</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onChangeTab?.('ai')}
-            className="opora-home-bento min-h-[116px] p-3.5 text-left dark:border-white/10 dark:bg-slate-800"
-          >
-            <span className="opora-home-picture small">💬</span>
-            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">Помощник</span>
-            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">Объяснить результаты простым языком.</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setStateMode('panic')}
-            className="opora-home-bento min-h-[116px] p-3.5 text-left dark:border-white/10 dark:bg-slate-800"
-          >
-            <span className="opora-home-picture small">🛟</span>
-            <span className="block text-[15px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">Помощь сейчас</span>
-            <span className="mt-1 block text-[12px] leading-snug text-opora-text dark:text-slate-300">Когда ребенок перегружен.</span>
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={onOpenDirectoryRecommendations}
-          className="mt-3 flex w-full items-center justify-between rounded-2xl border border-dashed border-opora-sage/30 bg-white/85 px-4 py-3 text-left transition-all active:scale-[0.99] dark:border-white/10 dark:bg-slate-800"
-        >
-          <span>
-            <span className="block text-sm font-extrabold text-opora-navy dark:text-slate-50">Родители знают лучше всех</span>
-            <span className="mt-0.5 block text-[11px] leading-snug text-opora-text dark:text-slate-300">Поделитесь местом, где ребенку было бережно и понятно.</span>
-          </span>
-          <span className="rounded-xl bg-opora-sage/10 px-2.5 py-1.5 text-lg">🤝</span>
-        </button>
-      </div>
-
-      <div className="px-6 mb-5">
-        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-opora-text/65">Еще разделы</p>
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {[
-            { id: 'pmpk', label: '📁 ПМПК' },
-            { id: 'route', label: '🧭 Маршрут KZ' },
-            { id: 'schedule', label: '📅 План дня' },
-            { id: 'podcasts', label: '🎧 Подкасты' },
-            { id: 'friendly', label: '☕ Места' },
-            { id: 'science', label: '🔬 База знаний' },
-          ].map(section => (
-            <button
-              key={section.id}
-              type="button"
-              onClick={() => setActiveCategory(activeCategory === section.id ? 'all' : section.id as any)}
-              className={`whitespace-nowrap rounded-xl border px-3.5 py-2 text-xs font-bold transition-all ${
-                activeCategory === section.id
-                  ? 'border-opora-navy bg-opora-navy text-white'
-                  : 'border-black/5 bg-white text-opora-navy dark:border-white/10 dark:bg-slate-800 dark:text-slate-100'
-              }`}
-            >
-              {section.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Active category clear indicator banner */}
       {activeCategory !== 'all' && (
-        <div className="px-6 mb-4">
+        <div ref={activeCategoryRef} className="px-6 mb-4 scroll-mt-4">
           <div className="flex items-center justify-between bg-opora-sand/50 p-2.5 rounded-xl border border-black/[0.01]">
             <span className="text-sm text-opora-navy font-semibold flex items-center gap-1.5 line-clamp-1">
               <span className="w-1.5 h-1.5 rounded-full bg-opora-sage animate-ping" />
