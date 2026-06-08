@@ -1,16 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Heart, Sparkles, ClipboardList, FileText, MapPinned, ShieldCheck, Scale, SearchCheck, FilePenLine, Stethoscope, Languages, HandHeart, Hospital, CheckCircle2, Circle, Clock3, Copy, ExternalLink } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { useProfile } from '../context/ProfileContext';
-import Markdown from 'react-markdown';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  buildDefaultMedicalCaseTracker,
-  buildMedicalCaseRoute,
-  calculateMedicalCaseProgress,
-  getNextMedicalCaseAction,
-  type MedicalCaseItemStatus,
-  type MedicalCaseTracker
-} from '../lib/medicalCaseManager';
+  ArrowUp,
+  BarChart3,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  Compass,
+  FileText,
+  HelpCircle,
+  Pill,
+  Search,
+  Send,
+  Sparkles,
+  Stethoscope,
+  Utensils,
+  Video
+} from 'lucide-react';
+import Markdown from 'react-markdown';
+import { useProfile } from '../context/ProfileContext';
+import { cn } from '../lib/utils';
+import type { TrackerView } from './CareTrackerTab';
 
 type Message = {
   id: string;
@@ -18,627 +27,297 @@ type Message = {
   content: string;
 };
 
-const helperActions = [
+type AssistantCardTone = 'violet' | 'blue' | 'amber' | 'mint' | 'rose' | 'soft';
+
+const quickPrompts = [
   {
-    label: 'Мне тяжело сейчас',
-    hint: 'быстро снизить тревогу',
-    icon: Heart,
-    tone: 'warm',
-    prompt: 'Мне очень страшно сейчас, некому поддержать. Помоги мне спокойно пережить ближайшие 10 минут.'
+    label: 'Плохо спит',
+    prompt: 'Мой ребенок плохо спит. Помоги понять, какие наблюдения записать сегодня и что обсудить со специалистом.'
   },
   {
-    label: 'Маршрут помощи',
-    hint: 'что делать дальше',
-    icon: MapPinned,
-    tone: 'sage',
-    prompt: 'С чего начать при подозрении на аутизм в Казахстане? Составь понятный маршрут на ближайшие недели.'
+    label: 'Новая реакция',
+    prompt: 'У ребенка появилась новая реакция. Помоги спокойно описать ее и понять следующий безопасный шаг.'
   },
   {
-    label: 'ПМПК и документы',
-    hint: 'подготовить комиссию',
-    icon: FileText,
-    tone: 'sage',
-    prompt: 'Помоги подготовиться к ПМПК в Казахстане: какие документы собрать и как спокойно пройти комиссию?'
+    label: 'Подготовка к врачу',
+    prompt: 'Помоги подготовиться к приему: какие вопросы задать врачу и что взять с собой.'
   },
   {
-    label: 'Подготовить визит',
-    hint: 'врач, стоматолог, стрижка',
-    icon: ClipboardList,
-    tone: 'sage',
-    prompt: 'Помоги подготовить ребенка с РАС к визиту: что сказать специалисту, что взять с собой и как снизить сенсорную нагрузку?'
+    label: 'Результаты анализа',
+    prompt: 'Я не понимаю результаты анализа. Помоги составить список вопросов врачу простыми словами.'
+  },
+  {
+    label: 'Найти специалиста',
+    prompt: 'Нужно найти специалиста для ребенка. Помоги понять, какой специалист нужен и по каким критериям выбирать.'
   }
 ];
 
-const medicalNavigatorActions = [
-  {
-    label: 'Остановить прогрессию',
-    hint: 'врач, досье, фонды',
-    icon: Stethoscope,
-    prompt: 'Моя цель — найти врача, который оценит, можно ли замедлить или остановить прогрессию болезни у ребенка. Диагноз/подозрение: [укажите]. Город: [город]. Что ухудшается: [симптомы и сроки]. Какие документы есть: [перечислите]. Нужны: узкий специалист, перевод выписок, фонды и письма в клиники.'
-  },
-  {
-    label: 'Досье в клинику',
-    hint: 'список и письмо',
-    icon: Hospital,
-    prompt: 'Помоги собрать медицинское досье для зарубежной клиники. Диагноз: [укажите]. Страна/язык: [Германия/Израиль/США/другое]. Документы на руках: [перечислите]. Подготовь список недостающих документов, требования к переводу и письмо в клинику.'
-  },
-  {
-    label: 'Фонд на лечение',
-    hint: 'Казахстан и заявки',
-    icon: HandHeart,
-    prompt: 'Найди фонды в Казахстане, которые могут помочь оплатить диагностику, лечение, реабилитацию или поездку. Диагноз: [укажите]. Сумма/услуга: [укажите]. Город: [город]. Подготовь черновик обращения и список приложений.'
-  },
-  {
-    label: 'Перевод выписок',
-    hint: 'точно для врачей',
-    icon: Languages,
-    prompt: 'Помоги подготовить технический медицинский перевод выписок для клиники. Язык: [английский/немецкий/иврит]. Текст выписки: [вставьте]. Сохрани диагнозы, дозировки, даты, единицы измерения и названия обследований.'
-  }
-];
-
-const legalActions = [
-  {
-    label: 'Составить обращение',
-    hint: 'адресат и текст письма',
-    icon: FilePenLine,
-    prompt: 'Помоги составить официальное обращение в госорган РК. Ситуация: [коротко опишите, что произошло]. Город: [город]. Категория: алименты / инвалидность / детский сад / другое. Документы на руках: [перечислите]. Что хочу получить: [результат]. Определи адресата и подготовь письмо для ручной подачи через e-Otinish/eGov/канцелярию.'
-  },
-  {
-    label: 'Проверить ответ',
-    hint: 'найти противоречия',
-    icon: SearchCheck,
-    prompt: 'Проанализируй ответ госоргана РК на предмет противоречий и проигнорированных прав. Моя просьба была: [вставьте кратко]. Ответ органа: [вставьте полный текст ответа]. Проверь, удовлетворена ли просьба, есть ли отписка, какие права ребенка или родителя могли быть проигнорированы.'
-  },
-  {
-    label: 'Подготовить опровержение',
-    hint: 'жалоба или эскалация',
-    icon: Scale,
-    prompt: 'Подготовь письмо-претензию/опровержение на ответ госоргана РК. Первичное обращение: [вставьте]. Полученный ответ: [вставьте]. Что, по моему мнению, проигнорировали: [перечислите]. Укажи следующую инстанцию и составь текст для ручной подачи.'
-  }
-];
-
-export function AIAssistantTab() {
+export function AIAssistantTab({
+  onChangeTab,
+  onOpenTrackerView
+}: {
+  onChangeTab?: (tab: 'navigator' | 'ai' | 'tracker' | 'directory' | 'community' | 'profile' | 'doctor') => void;
+  onOpenTrackerView?: (view: TrackerView) => void;
+}) {
   const { profile } = useProfile();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [medicalCaseTracker, setMedicalCaseTracker] = useState<MedicalCaseTracker | null>(null);
-  const [copiedMedicalTemplateId, setCopiedMedicalTemplateId] = useState<string | null>(null);
-  const endOfMessagesRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Initialize companion messages using the child's profile details
-  useEffect(() => {
-    const welcomeText = `Я рядом. Для ${profile.childName || "ребенка"} (${profile.childAge} лет) сейчас этап: «${profile.diagnosticStatus}».\n\nМогу простыми словами объяснить термины, подсказать первые шаги в Казахстане, помочь найти врача, собрать документы, подготовить перевод, письма в клиники и обращения в фонды.`;
-    
-    setMessages([
-      {
-        id: '1',
-        role: 'assistant',
-        content: welcomeText
-      }
-    ]);
-  }, [profile.childName, profile.childAge, profile.diagnosticStatus]);
-
-  useEffect(() => {
-    endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  const latestAnswerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const input = inputRef.current;
     if (!input) return;
     input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
+    input.style.height = `${Math.min(input.scrollHeight, 150)}px`;
   }, [inputValue]);
 
   useEffect(() => {
-    const saved = localStorage.getItem(`opora_medical_case_tracker_${profile.id}`);
-    setMedicalCaseTracker(saved ? JSON.parse(saved) : null);
-  }, [profile.id]);
+    if (!messages.length) return;
+    latestAnswerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [messages.length]);
 
-  useEffect(() => {
-    if (!medicalCaseTracker) return;
-    localStorage.setItem(`opora_medical_case_tracker_${profile.id}`, JSON.stringify(medicalCaseTracker));
-  }, [medicalCaseTracker, profile.id]);
+  const sendPrompt = async (prompt: string) => {
+    if (isTyping || !prompt.trim()) return;
+    const userQuery = prompt.trim();
+    const nextMessages = [...messages, { id: `${Date.now()}-user`, role: 'user' as const, content: userQuery }];
 
-  const medicalCaseRoute = buildMedicalCaseRoute(profile, 'найти врача который оценит прогрессию');
-  const requiredMedicalDocuments = medicalCaseRoute.documents.filter(item => item.required).slice(0, 5);
-  const compactMedicalTemplates = medicalCaseRoute.templates.map(template => ({
-    ...template,
-    copyText: `${template.bodyRu}\n\n---\n\n${template.bodyEn}`
-  }));
-
-  const startMedicalCaseTracker = () => {
-    const tracker = buildDefaultMedicalCaseTracker(medicalCaseRoute, profile.id);
-    setMedicalCaseTracker(tracker);
-    setInputValue(medicalNavigatorActions[0].prompt);
-  };
-
-  const copyMedicalTemplate = async (id: string, text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedMedicalTemplateId(id);
-      window.setTimeout(() => setCopiedMedicalTemplateId(current => current === id ? null : current), 1800);
-    } catch (error) {
-      console.error("Failed to copy medical template:", error);
-      setInputValue(text);
-    }
-  };
-
-  const updateMedicalCaseItemStatus = (id: string, status: MedicalCaseItemStatus) => {
-    setMedicalCaseTracker(prev => {
-      if (!prev) return prev;
-      const now = new Date().toISOString();
-      return {
-        ...prev,
-        updatedAt: now,
-        items: prev.items.map(item => item.id === id
-          ? {
-              ...item,
-              status,
-              completedAt: status === 'done' ? now : undefined
-            }
-          : item)
-      };
-    });
-  };
-
-  const medicalCaseProgress = medicalCaseTracker ? calculateMedicalCaseProgress(medicalCaseTracker) : null;
-  const nextMedicalCaseAction = medicalCaseTracker ? getNextMedicalCaseAction(medicalCaseTracker) : null;
-
-  const handleSend = async () => {
-    if (isTyping || !inputValue.trim()) return;
-
-    const userQuery = inputValue.trim();
-    const newMsg: Message = { id: Date.now().toString(), role: 'user', content: userQuery };
-    const currentMessages = [...messages, newMsg];
-    
-    setMessages(currentMessages);
+    setMessages(nextMessages);
     setInputValue('');
     setIsTyping(true);
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: currentMessages.filter(m => m.id !== '1'), // Exclude intro to save context space if needed, or pass it. Let's pass it actually.
-          profile: profile
-        }),
+          messages: nextMessages,
+          profile
+        })
       });
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-
+      if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
-      
-      setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', content: data.reply }]);
+      setMessages(prev => [...prev, { id: `${Date.now()}-assistant`, role: 'assistant', content: data.reply }]);
     } catch (error) {
-      console.error("Failed to send message:", error);
-      setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        role: 'assistant', 
-        content: 'Простите, сейчас у меня небольшая заминка со связью. Пожалуйста, попробуйте отправить ваше сообщение чуть позже. Я здесь и никуда не ухожу.' 
-      }]);
+      console.error('Failed to send assistant prompt:', error);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `${Date.now()}-assistant`,
+          role: 'assistant',
+          content: 'Связь с помощником сейчас нестабильна. Самый бережный следующий шаг: запишите один факт, время, что было до реакции и что помогло. Потом покажите это специалисту.'
+        }
+      ]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
+  const handleSend = () => sendPrompt(inputValue);
+
+  const handleKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
       handleSend();
     }
   };
 
+  const childName = profile.childName || 'Амаль';
+  const latestAssistantAnswer = [...messages].reverse().find(message => message.role === 'assistant');
+  const navigatorCards: Array<{
+    title: string;
+    desc: string;
+    icon: React.ElementType;
+    tone: AssistantCardTone;
+    size?: 'hero' | 'wide';
+    cta?: string;
+    onClick: () => void;
+  }> = [
+    {
+      title: 'Что делать дальше?',
+      desc: `Получите персональный маршрут помощи для ${childName}`,
+      icon: Compass,
+      tone: 'violet',
+      size: 'hero',
+      cta: 'Получить маршрут',
+      onClick: () => sendPrompt(`Составь спокойный персональный маршрут помощи для ${childName}. Этап: ${profile.diagnosticStatus}. Нужен один следующий шаг на сегодня и план на ближайшие недели.`)
+    },
+    {
+      title: 'Подготовиться к врачу',
+      desc: 'Соберем важное для приема',
+      icon: ClipboardCheck,
+      tone: 'blue',
+      onClick: () => sendPrompt('Помоги подготовиться к врачу: вопросы, наблюдения, документы и как коротко описать состояние ребенка.')
+    },
+    {
+      title: 'Разобрать назначения',
+      desc: 'Понятно о лекарствах, дозировках и схемах',
+      icon: Pill,
+      tone: 'amber',
+      onClick: () => {
+        if (onOpenTrackerView) onOpenTrackerView('meds');
+        else sendPrompt('Помоги разобрать назначения врача простыми словами и подготовить вопросы по лекарствам.');
+      }
+    },
+    {
+      title: 'Сформировать отчет',
+      desc: 'PDF отчет по данным ребенка за любой период',
+      icon: BarChart3,
+      tone: 'mint',
+      onClick: () => {
+        if (onOpenTrackerView) onOpenTrackerView('report');
+        else sendPrompt('Помоги сформировать краткий отчет для врача по наблюдениям ребенка.');
+      }
+    },
+    {
+      title: 'Видео-отчет',
+      desc: 'Короткое видео для врача или семьи',
+      icon: Video,
+      tone: 'rose',
+      onClick: () => {
+        if (onOpenTrackerView) onOpenTrackerView('video');
+        else sendPrompt('Помоги подготовить безопасный видео-отчет для врача.');
+      }
+    },
+    {
+      title: 'Задать вопрос',
+      desc: 'О состоянии, развитии, анализах',
+      icon: HelpCircle,
+      tone: 'soft',
+      size: 'wide',
+      onClick: () => inputRef.current?.focus()
+    }
+  ];
+
   return (
-    <div className="min-h-full flex flex-col bg-opora-sand/30">
-      {/* Header */}
-      <div className="opora-ai-header pt-12 px-6 pb-4 border-b border-black/5 flex items-center justify-between bg-opora-sand/80 backdrop-blur-xl sticky top-0 z-20">
-        <div>
-          <h1 className="font-serif text-2xl font-medium text-opora-navy mb-1 flex items-center gap-2">
-            Помощник <Sparkles className="text-opora-sage drop-shadow-sm" size={17} />
-          </h1>
-          <p className="text-sm text-opora-sage flex items-center gap-1.5 font-semibold">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+    <div className="opora-ai-navigator min-h-full pb-6 pt-6">
+      <section className="opora-ai-hero mx-5">
+        <div className="opora-ai-hero-copy">
+          <div className="opora-ai-title-row">
+            <h1>Помощник Опоры</h1>
+            <span className="opora-ai-mini-logo">
+              <Sparkles size={18} />
             </span>
-            Бережно и простыми словами
-          </p>
-        </div>
-      </div>
-
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto px-5 pt-5 pb-28 space-y-5">
-        <div className="opora-ai-intro rounded-2xl border border-black/5 px-4 py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-2xl bg-opora-sage/10 text-opora-sage flex items-center justify-center shrink-0">
-              <ShieldCheck size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className="text-[11px] uppercase tracking-wider font-extrabold text-opora-sage mb-1">
-                Не заменяет врача
-              </div>
-              <p className="text-sm text-opora-navy font-bold leading-snug">
-                Я помогу разложить ситуацию, подготовить вопросы и снизить тревогу.
-              </p>
-              <p className="text-xs text-opora-text/80 font-medium mt-1.5 leading-relaxed">
-                Срочные медицинские решения всегда обсуждаются с врачом или экстренной службой.
-              </p>
-            </div>
           </div>
-        </div>
+          <p className="opora-ai-subtitle">Помогаю разобраться в следующем шаге</p>
 
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-opora-text/60 mb-2 px-1">Быстрый старт</p>
-          <div className="grid grid-cols-2 gap-2">
-            {helperActions.map(action => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => setInputValue(action.prompt)}
-                  className={`opora-ai-action text-left p-3 rounded-2xl border transition-all active:scale-[0.98] ${
-                    action.tone === 'warm'
-                      ? 'bg-opora-peach/35 border-opora-peach/70'
-                      : 'bg-white border-black/5'
-                  }`}
-                >
-                  <span className={`w-8 h-8 rounded-xl flex items-center justify-center mb-2 ${
-                    action.tone === 'warm' ? 'bg-white/80 text-rose-500' : 'bg-opora-sage/10 text-opora-sage'
-                  }`}>
-                    <Icon size={16} />
-                  </span>
-                  <span className="block text-sm font-extrabold text-opora-navy leading-tight">{action.label}</span>
-                  <span className="block text-[11px] text-opora-text/75 mt-0.5 leading-snug">{action.hint}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-opora-sage text-white">
-              <Stethoscope size={16} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                Медицинский навигатор до Точки Б
-              </p>
-              <p className="text-xs font-bold leading-snug text-opora-navy">
-                Врач, досье, перевод, фонды и письма
-              </p>
-            </div>
-          </div>
-          <div className="grid gap-2">
-            {medicalNavigatorActions.map(action => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => setInputValue(action.prompt)}
-                  className="flex min-h-[58px] items-center gap-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.98]"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-opora-peach/35 text-opora-navy">
-                    <Icon size={17} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-extrabold leading-tight text-opora-navy">{action.label}</span>
-                    <span className="block text-[11px] font-medium leading-snug text-opora-text/70">{action.hint}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="opora-ai-intro rounded-2xl border border-opora-peach/50 bg-white/80 px-4 py-4">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                Трекер медицинского кейса
-              </p>
-              <p className="text-sm font-extrabold leading-snug text-opora-navy">
-                {medicalCaseTracker ? medicalCaseTracker.title : 'Дойти до Точки Б по шагам'}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={startMedicalCaseTracker}
-              className="shrink-0 rounded-xl bg-opora-navy px-3 py-2 text-[11px] font-extrabold text-white shadow-sm active:scale-[0.98]"
-            >
-              {medicalCaseTracker ? 'Обновить' : 'Создать'}
+          <div className="opora-ai-today-block">
+            <button type="button" onClick={() => onChangeTab?.('navigator')} className="opora-ai-child-link">
+              Сегодня для <strong>{childName}</strong>
+              <ChevronRight size={16} />
             </button>
-          </div>
-
-          {medicalCaseTracker && medicalCaseProgress ? (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-rose-100 bg-rose-50/70 px-3 py-2.5">
-                <div className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-rose-600">
-                  <Stethoscope size={13} />
-                  Критическое действие
-                </div>
-                <p className="text-sm font-bold leading-snug text-opora-navy">
-                  {medicalCaseRoute.criticalAction}
-                </p>
-              </div>
-
+            <div className="opora-ai-today-list">
               <div>
-                <div className="mb-1 flex items-center justify-between text-[11px] font-bold text-opora-text/70">
-                  <span>{medicalCaseProgress.doneCount} из {medicalCaseProgress.totalCount} шагов готово</span>
-                  <span>{medicalCaseProgress.percent}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-opora-sand">
-                  <div
-                    className="h-full rounded-full bg-opora-sage transition-all"
-                    style={{ width: `${medicalCaseProgress.percent}%` }}
-                  />
-                </div>
+                <span className="opora-ai-today-icon violet"><Clock3 size={17} /></span>
+                <span>1 лекарство через 40 минут</span>
               </div>
+              <div>
+                <span className="opora-ai-today-icon mint"><FileText size={17} /></span>
+                <span>Новый отчет готов</span>
+              </div>
+              <div>
+                <span className="opora-ai-today-icon amber"><Utensils size={17} /></span>
+                <span>Есть 2 незавершенные записи питания</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-              {nextMedicalCaseAction && (
-                <div className="rounded-xl border border-opora-sage/20 bg-opora-sage/10 px-3 py-2.5">
-                  <div className="mb-1 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                    <Clock3 size={13} />
-                    Следующее действие
-                  </div>
-                  <p className="text-sm font-bold leading-snug text-opora-navy">{nextMedicalCaseAction.title}</p>
-                  <p className="mt-1 text-xs font-medium leading-relaxed text-opora-text/80">
-                    {nextMedicalCaseAction.deadline}: {nextMedicalCaseAction.action}
-                  </p>
-                </div>
+        <div className="opora-ai-orb-wrap" aria-hidden="true">
+          <div className="opora-ai-orb">
+            <span className="mountain one" />
+            <span className="mountain two" />
+            <span className="road" />
+            <span className="star" />
+          </div>
+          <div className="opora-ai-orb-base" />
+        </div>
+      </section>
+
+      <section className="opora-ai-bento px-5 pt-5">
+        {navigatorCards.map(card => {
+          const Icon = card.icon;
+          return (
+            <button
+              key={card.title}
+              type="button"
+              onClick={card.onClick}
+              className={cn('opora-ai-nav-card', `tone-${card.tone}`, card.size === 'hero' && 'hero', card.size === 'wide' && 'wide')}
+            >
+              <span className="opora-ai-nav-icon">
+                <Icon size={30} />
+              </span>
+              <span className="opora-ai-nav-copy">
+                <strong>{card.title}</strong>
+                <span>{card.desc}</span>
+              </span>
+              {card.cta ? (
+                <span className="opora-ai-route-button">
+                  {card.cta}
+                  <ArrowUp size={16} />
+                </span>
+              ) : (
+                <span className="opora-ai-nav-arrow">
+                  <ChevronRight size={18} />
+                </span>
               )}
+            </button>
+          );
+        })}
+      </section>
 
-              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                  <FileText size={13} />
-                  Документы для старта
-                </div>
-                <div className="space-y-2">
-                  {requiredMedicalDocuments.map(item => (
-                    <div key={item.id} className="flex gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-opora-sage" />
-                      <div className="min-w-0">
-                        <p className="text-xs font-extrabold leading-snug text-opora-navy">{item.title}</p>
-                        <p className="mt-0.5 text-[11px] font-medium leading-relaxed text-opora-text/75">{item.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                  <HandHeart size={13} />
-                  Фонды Казахстана
-                </div>
-                <div className="grid gap-2">
-                  {medicalCaseRoute.foundations.map(item => (
-                    <a
-                      key={item.id}
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-start justify-between gap-2 rounded-lg bg-opora-sand/60 px-2.5 py-2 text-left"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-xs font-extrabold leading-snug text-opora-navy">{item.name}</span>
-                        <span className="mt-0.5 block text-[11px] font-medium leading-relaxed text-opora-text/75">{item.fit}</span>
-                      </span>
-                      <ExternalLink size={13} className="mt-0.5 shrink-0 text-opora-sage" />
-                    </a>
-                  ))}
-                </div>
-                <p className="mt-2 text-[11px] font-medium leading-relaxed text-opora-text/70">
-                  Правила приема, диагнозы, документы и наличие финансирования нужно проверить на сайте фонда перед подачей.
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-black/5 bg-white px-3 py-3">
-                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                  <Copy size={13} />
-                  Письма, готовые к копированию
-                </div>
-                <div className="space-y-2">
-                  {compactMedicalTemplates.map(template => (
-                    <div key={template.id} className="rounded-lg bg-opora-sand/60 px-2.5 py-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-extrabold leading-snug text-opora-navy">{template.title}</p>
-                          <p className="mt-0.5 line-clamp-2 text-[11px] font-medium leading-relaxed text-opora-text/75">
-                            {template.bodyRu.split("\n").slice(0, 3).join(" ")}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => copyMedicalTemplate(template.id, template.copyText)}
-                          className="shrink-0 rounded-lg bg-white px-2 py-1.5 text-[10px] font-extrabold text-opora-navy shadow-sm active:scale-[0.98]"
-                        >
-                          {copiedMedicalTemplateId === template.id ? 'Скопировано' : 'Копировать'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {medicalCaseTracker.items.map(item => (
-                  <div key={item.id} className="rounded-xl border border-black/5 bg-white px-3 py-2.5">
-                    <div className="flex items-start gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateMedicalCaseItemStatus(item.id, item.status === 'done' ? 'todo' : 'done')}
-                        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-opora-sand text-opora-sage"
-                        aria-label={item.status === 'done' ? 'Отметить шаг как не готовый' : 'Отметить шаг готовым'}
-                      >
-                        {item.status === 'done' ? <CheckCircle2 size={17} /> : <Circle size={17} />}
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <p className="text-sm font-extrabold leading-tight text-opora-navy">{item.title}</p>
-                          <span className="rounded-full bg-opora-sand px-2 py-0.5 text-[10px] font-extrabold text-opora-text/70">
-                            {item.deadline}
-                          </span>
-                        </div>
-                        <p className="mt-1 text-xs font-medium leading-relaxed text-opora-text/75">{item.output}</p>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {([
-                            ['todo', 'не начато'],
-                            ['requested', 'запрошено'],
-                            ['sent', 'отправлено'],
-                            ['waiting', 'ждем ответ'],
-                            ['done', 'готово']
-                          ] as Array<[MedicalCaseItemStatus, string]>).map(([status, label]) => (
-                            <button
-                              key={status}
-                              type="button"
-                              onClick={() => updateMedicalCaseItemStatus(item.id, status)}
-                              className={`rounded-full px-2 py-1 text-[10px] font-extrabold transition-all ${
-                                item.status === status
-                                  ? 'bg-opora-navy text-white'
-                                  : 'bg-opora-sand text-opora-text/70'
-                              }`}
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl bg-opora-sand/70 px-3 py-3">
-              <p className="text-sm font-bold leading-snug text-opora-navy">
-                Создайте кейс, и здесь появится прогресс: документы, перевод, фонды, клиники и следующий шаг.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="opora-ai-intro rounded-2xl border border-opora-sage/20 bg-white/75 px-4 py-4">
-          <div className="mb-3 flex items-center gap-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-opora-navy text-white">
-              <Scale size={16} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-opora-sage">
-                Письма и юридический контроль
-              </p>
-              <p className="text-xs font-bold leading-snug text-opora-navy">
-                Черновики для e-Otinish, eGov и письменных обращений
-              </p>
-            </div>
+      {(latestAssistantAnswer || isTyping) && (
+        <section ref={latestAnswerRef} className="opora-ai-answer mx-5 mt-5">
+          <div className="opora-ai-answer-label">
+            <Sparkles size={15} />
+            Ответ помощника
           </div>
-          <div className="grid gap-2">
-            {legalActions.map(action => {
-              const Icon = action.icon;
-              return (
-                <button
-                  key={action.label}
-                  type="button"
-                  onClick={() => setInputValue(action.prompt)}
-                  className="flex min-h-[58px] items-center gap-3 rounded-2xl border border-black/5 bg-white px-3 py-2.5 text-left shadow-sm transition-all active:scale-[0.98]"
-                >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-opora-sage/10 text-opora-sage">
-                    <Icon size={17} />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm font-extrabold leading-tight text-opora-navy">{action.label}</span>
-                    <span className="block text-[11px] font-medium leading-snug text-opora-text/70">{action.hint}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          {isTyping ? (
+            <div className="opora-ai-thinking">
+              <span />
+              <span />
+              <span />
+            </div>
+          ) : latestAssistantAnswer ? (
+            <div className="markdown-body">
+              <Markdown>{latestAssistantAnswer.content}</Markdown>
+            </div>
+          ) : null}
+        </section>
+      )}
 
-        <AnimatePresence>
-          {messages.map((msg) => (
-            <motion.div
-              key={msg.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-            >
-              <div className="flex items-end gap-2 max-w-[92%]">
-                {msg.role === 'assistant' && (
-                  <div className="w-6 h-6 rounded-full bg-opora-peach flex items-center justify-center flex-shrink-0 mb-1">
-                    <Sparkles size={11} className="text-opora-navy" />
-                  </div>
-                )}
-                
-                <div className={`opora-ai-message p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
-                  msg.role === 'user' 
-                    ? 'bg-opora-navy text-white rounded-br-none font-medium whitespace-pre-wrap' 
-                    : 'bg-white border border-opora-sage/20 text-opora-navy rounded-bl-none markdown-body'
-                }`}>
-                  {msg.role === 'assistant' ? (
-                    <Markdown components={{
-                      a: ({node, ...props}) => <a {...props} className="text-opora-sage underline hover:text-opora-navy font-semibold" target="_blank" rel="noopener noreferrer" />
-                    }}>
-                      {msg.content}
-                    </Markdown>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-          {isTyping && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-end gap-2 max-w-[85%]"
-            >
-               <div className="w-6 h-6 rounded-full bg-opora-peach flex items-center justify-center flex-shrink-0 mb-1">
-                  <Sparkles size={11} className="text-opora-navy" />
-                </div>
-              <div className="opora-ai-message p-3.5 rounded-2xl bg-white border border-opora-sage/20 text-opora-navy rounded-bl-sm shadow-sm flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-opora-sage rounded-full animate-bounce"></span>
-                <span className="w-1.5 h-1.5 bg-opora-sage rounded-full animate-bounce" style={{animationDelay: '150ms'}}></span>
-                <span className="w-1.5 h-1.5 bg-opora-sage rounded-full animate-bounce" style={{animationDelay: '300ms'}}></span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <div ref={endOfMessagesRef} className="h-4" />
-      </div>
-
-      {/* Input */}
-      <div className="opora-ai-inputbar px-4 py-3 bg-white/80 backdrop-blur-xl border-t border-black/5 pb-8 relative z-20">
-        <div className="flex relative items-end group shadow-sm rounded-2xl">
+      <section className="opora-ai-composer mx-5 mt-5">
+        <div className="opora-ai-input-shell">
+          <Sparkles size={20} className="opora-ai-input-spark" />
           <textarea
             ref={inputRef}
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={event => setInputValue(event.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Спросите о медицинском маршруте, правах в РК или поделитесь..."
-            className="opora-ai-input w-full bg-white border border-black/5 rounded-2xl py-3.5 pl-4 pr-14 text-[13px] font-medium leading-relaxed focus:outline-none focus:ring-4 focus:ring-opora-sage/10 focus:border-opora-sage resize-none overflow-y-auto text-opora-navy placeholder:text-opora-text/40 shadow-sm transition-all"
-            rows={2}
-            style={{ minHeight: '64px', maxHeight: '180px' }}
+            placeholder="Что вас беспокоит сегодня?"
+            rows={1}
+            className="opora-ai-navigator-input"
           />
-          <button 
-            onClick={handleSend}
-            disabled={!inputValue.trim() || isTyping}
-            className="absolute right-2 bottom-2 p-2.5 bg-opora-navy text-white rounded-2xl disabled:opacity-50 disabled:bg-gray-300 hover:-translate-y-0.5 active:translate-y-0 transition-all shadow-md shadow-opora-navy/10"
-          >
-            <Send size={15} />
+          <button type="button" onClick={handleSend} disabled={!inputValue.trim() || isTyping} className="opora-ai-send">
+            <Send size={18} />
           </button>
         </div>
-      </div>
+
+        <div className="opora-ai-quick-actions">
+          {quickPrompts.map(prompt => (
+            <button key={prompt.label} type="button" onClick={() => setInputValue(prompt.prompt)}>
+              {prompt.label === 'Плохо спит' && '😴 '}
+              {prompt.label === 'Новая реакция' && '😟 '}
+              {prompt.label === 'Подготовка к врачу' && '🩺 '}
+              {prompt.label === 'Результаты анализа' && '📄 '}
+              {prompt.label === 'Найти специалиста' && '👨‍⚕️ '}
+              {prompt.label}
+            </button>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

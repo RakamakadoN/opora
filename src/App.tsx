@@ -67,7 +67,15 @@ function AppContent() {
           />
         );
       case 'ai':
-        return <AIAssistantTab />;
+        return (
+          <AIAssistantTab
+            onChangeTab={setActiveTab}
+            onOpenTrackerView={(view) => {
+              setTrackerInitialView(view);
+              setActiveTab('tracker');
+            }}
+          />
+        );
       case 'tracker':
         return <CareTrackerTab initialView={trackerInitialView} />;
       case 'directory':
@@ -85,7 +93,7 @@ function AppContent() {
     <div className="flex min-h-screen items-center justify-center p-0 sm:p-4">
       <div className="opora-device-frame opora-shell opora-mobile-shell relative flex w-full max-w-none flex-col overflow-hidden font-sans sm:h-[844px] sm:max-w-[410px] sm:rounded-[2rem] sm:border sm:border-white/70">
         <main className="opora-shell-main relative z-10 min-w-0 flex-1 overflow-y-auto scroll-smooth">
-          <div className={`opora-role-switcher px-4 pt-3 ${appRole === 'parent' && activeTab === 'navigator' ? 'hidden' : 'flex justify-end'}`}>
+          <div className={`opora-role-switcher px-4 pt-3 ${appRole === 'parent' && ['navigator', 'ai'].includes(activeTab) ? 'hidden' : 'flex justify-end'}`}>
             <div className="flex max-w-full flex-wrap justify-end gap-1 rounded-2xl border border-black/5 bg-white/80 p-1 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/80">
             {[
               { id: 'parent', label: 'Я родитель' },
