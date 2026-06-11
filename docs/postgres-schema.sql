@@ -31,7 +31,7 @@ create table children (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid not null references profiles(id) on delete cascade,
   family_id uuid,
-  local_child_id text unique,
+  local_child_id text,
   name text not null,
   age_years int not null check (age_years between 0 and 18),
   diagnostic_status text not null,
@@ -50,6 +50,11 @@ create table families (
 
 alter table children
   add constraint children_family_id_fkey foreign key (family_id) references families(id) on delete cascade;
+alter table children drop constraint if exists children_local_child_id_key;
+alter table children drop constraint if exists children_family_local_child_id_key;
+alter table children drop constraint if exists children_family_id_local_child_id_key;
+alter table children
+  add constraint children_family_id_local_child_id_key unique (family_id, local_child_id);
 
 create table family_members (
   id uuid primary key default gen_random_uuid(),

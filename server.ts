@@ -1004,9 +1004,8 @@ const ensureFamilyChildFromLocalId = async (familyId: string, localChildId: stri
   const result = await pgQuery(
     `insert into children (family_id, local_child_id, name, age_years, diagnostic_status, city, color_token, updated_at)
      values ($1, $2, $3, $4, $5, $6, $7, now())
-     on conflict (local_child_id)
-     do update set family_id = excluded.family_id,
-                   name = excluded.name,
+     on conflict (family_id, local_child_id)
+     do update set name = excluded.name,
                    age_years = excluded.age_years,
                    diagnostic_status = excluded.diagnostic_status,
                    city = excluded.city,
@@ -2585,8 +2584,8 @@ export async function startServer() {
     });
   }
 
-  app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  app.listen(PORT, "127.0.0.1", () => {
+    console.log(`Server running on http://127.0.0.1:${PORT}`);
   });
 }
 

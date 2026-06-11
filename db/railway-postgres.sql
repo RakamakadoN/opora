@@ -71,7 +71,7 @@ create table if not exists children (
   id uuid primary key default gen_random_uuid(),
   parent_id uuid references profiles(id) on delete cascade,
   family_id uuid,
-  local_child_id text unique,
+  local_child_id text,
   name text not null,
   age_years int not null default 0 check (age_years between 0 and 18),
   diagnostic_status text,
@@ -91,6 +91,11 @@ create table if not exists families (
 
 alter table if exists children add column if not exists family_id uuid;
 alter table if exists children add column if not exists color_token text;
+alter table if exists children drop constraint if exists children_local_child_id_key;
+alter table if exists children drop constraint if exists children_family_local_child_id_key;
+alter table if exists children drop constraint if exists children_family_id_local_child_id_key;
+alter table if exists children
+  add constraint children_family_id_local_child_id_key unique (family_id, local_child_id);
 
 do $$
 begin

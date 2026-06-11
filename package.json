@@ -18,6 +18,7 @@
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
     "db:migrate": "node scripts/migrate-railway-postgres.mjs",
+    "db:backfill-family-structure": "node node_modules/tsx/dist/cli.mjs scripts/backfill-family-structure.ts",
     "parse:directory": "node scripts/parse-directory-sources.mjs",
     "update:kz-google-places": "node scripts/update-kz-google-places.mjs",
     "update:us-directory": "node scripts/update-us-directory.mjs"
