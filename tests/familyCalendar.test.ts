@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { join } from "node:path";
 import {
   buildFamilyCalendarEventsFromSources,
   expandFamilyEventOccurrences,
@@ -293,5 +295,42 @@ test("postgres schema includes family calendar tables", () => {
     "family_notification_jobs"
   ]) {
     assert.match(POSTGRES_SCHEMA_SQL, new RegExp(`create table if not exists ${table}`));
+  }
+});
+
+test("supabase migrations cover the June 7 family calendar and checklist backend", () => {
+  const migrationDir = join(process.cwd(), "supabase", "migrations");
+  const schemaMigration = join(migrationDir, "20260607000000_family_calendar_and_institution_checklist.sql");
+  const rlsMigration = join(migrationDir, "20260607001000_family_calendar_and_institution_checklist_rls.sql");
+
+  assert.equal(existsSync(schemaMigration), true);
+  assert.equal(existsSync(rlsMigration), true);
+
+  const schemaSql = readFileSync(schemaMigration, "utf8");
+  const rlsSql = readFileSync(rlsMigration, "utf8");
+
+  for (const table of [
+    "families",
+    "family_members",
+    "family_calendar_events",
+    "family_event_assignments",
+    "family_recurrence_rules",
+    "family_recurrence_exceptions",
+    "family_event_occurrence_states",
+    "family_notification_preferences",
+    "family_notification_jobs",
+    "institution_checklist_progress"
+  ]) {
+    assert.match(schemaSql, new RegExp(`create table if not exists ${table}`));
+  }
+
+  for (const policy of [
+    "families_select_member",
+    "family_calendar_events_select_family_member",
+    "family_notification_preferences_select_owner_or_self",
+    "institution_checklist_progress_select_own",
+    "institution_guides_public_read"
+  ]) {
+    assert.match(rlsSql, new RegExp(`create policy ${policy}`));
   }
 });

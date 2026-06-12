@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { MapPin, CheckCircle2, Circle, ArrowRight, BookOpen, Quote, Bookmark, X, Sparkles, ClipboardCheck, FileText, Info, Bell, BellRing, Settings2, Clock, Volume2, Heart, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, Printer, Share2, ShieldAlert, VolumeX, Phone, Activity, Smile, Send, Pill, Salad, NotebookPen, BrainCircuit, Siren, UsersRound, Stethoscope, Video, Route, UserRound, CalendarDays } from 'lucide-react';
+import { MapPin, CheckCircle2, Circle, ArrowRight, BookOpen, Quote, Bookmark, X, Sparkles, ClipboardCheck, ClipboardList, FileText, Info, Bell, BellRing, Settings2, Clock, Volume2, Heart, HeartHandshake, ChevronLeft, ChevronRight, ChevronDown, HelpCircle, Printer, Share2, ShieldAlert, VolumeX, Phone, Activity, Smile, Send, Pill, Salad, NotebookPen, BrainCircuit, Siren, UsersRound, Stethoscope, Video, Route, UserRound, CalendarDays } from 'lucide-react';
 import { useProfile, ARTICLES_DATABASE, DiagnosticStatus, type MessageTemplate, type ParentTask, type VisitCardDraft } from '../context/ProfileContext';
 import Markdown from 'react-markdown';
 import { SciencePulse } from './SciencePulse';
@@ -1363,57 +1363,54 @@ export function NavigatorTab({
   };
 
   const childAgeLabel = `${profile.childAge} ${profile.childAge === 1 ? 'год' : profile.childAge > 1 && profile.childAge < 5 ? 'года' : 'лет'}`;
-  const latestHomeNote = childDiaryEntries[0]?.content || latestSuccess?.title || latestRoutine?.title || 'Сегодня можно записать одно наблюдение без спешки.';
-  const nextBookingTime = upcomingBooking?.date
-    ? new Date(upcomingBooking.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' })
-    : 'по готовности';
-  const homeReminderRows = [
-    {
-      id: 'step',
-      icon: Sparkles,
-      time: 'сегодня',
-      title: nextBestAction,
-      done: specialistReadyPercent >= 80
-    },
-    {
-      id: 'docs',
-      icon: FileText,
-      time: bureaucracyNearestDeadline ? bureaucracyNearestDeadline.date : 'документы',
-      title: bureaucracyNearestDeadline ? bureaucracyNearestDeadline.title : `${bureaucracyProgress.checkedCount}/${bureaucracyProgress.totalCount} готово`,
-      done: bureaucracyProgress.percent >= 100
-    },
-    {
-      id: 'visit',
-      icon: CalendarDays,
-      time: nextBookingTime,
-      title: upcomingBooking ? `Прием: ${upcomingBooking.doctorName}` : 'Следующее напоминание',
-      done: false
-    }
-  ];
-  const homeBentoCards: Array<{
+  const nextRouteStep = Math.min(Math.max(currentActiveStageId, 1), 4);
+  const routeSteps = [
+    { number: '1', label: 'Скрининг', state: nextRouteStep > 1 ? 'done' : nextRouteStep === 1 ? 'current' : 'future' },
+    { number: '2', label: 'Подготовка документов', state: nextRouteStep > 2 ? 'done' : nextRouteStep === 2 ? 'current' : 'future' },
+    { number: '3', label: 'ПМПК', state: nextRouteStep > 3 ? 'done' : nextRouteStep === 3 ? 'current' : 'future' },
+    { number: '4', label: 'Подбор терапии', state: nextRouteStep > 4 ? 'done' : nextRouteStep === 4 ? 'current' : 'future' }
+  ] as const;
+  const homeQuickActions: Array<{
     id: string;
     title: string;
     desc: string;
     icon: React.ElementType;
     tone: HomeBentoTone;
     badge?: string;
-    size?: 'wide' | 'tall';
     action: () => void;
   }> = [
-    { id: 'meds', title: 'Лекарства', desc: 'Расписание, прием, напоминания', icon: Pill, tone: 'purple', badge: '2', size: 'tall', action: () => openTrackerView('meds') },
-    { id: 'food', title: 'Питание', desc: 'Рацион, реакции, ограничения', icon: Salad, tone: 'mint', action: () => openTrackerView('food') },
-    { id: 'diary', title: 'Дневник', desc: 'Поведение, настроение, заметки', icon: NotebookPen, tone: 'blue', action: () => openTrackerView('day') },
-    { id: 'diagnostics', title: 'Диагностика', desc: 'ПМПК, анализы, документы', icon: Stethoscope, tone: 'amber', action: () => openCategory('pmpk') },
-    { id: 'video', title: 'Видео-анализ', desc: 'Загрузить видео, получить оценку', icon: Video, tone: 'rose', action: () => openTrackerView('video') },
-    { id: 'tests', title: 'Тесты', desc: 'M-CHAT, скрининги, опросники', icon: ClipboardCheck, tone: 'teal', action: () => completeSoftScreening() },
-    { id: 'specialists', title: 'Специалисты', desc: 'Врачи, логопеды, ABA, психологи', icon: UsersRound, tone: 'indigo', action: () => onChangeTab?.('directory') },
-    { id: 'route', title: 'Маршрут помощи', desc: 'Что делать дальше, следующий шаг', icon: Route, tone: 'orange', action: () => openCategory('route') },
-    { id: 'reports', title: 'Отчеты', desc: 'Для врача, PDF, видео-отчет', icon: FileText, tone: 'purple', action: () => openTrackerView('report') },
-    { id: 'knowledge', title: 'База знаний', desc: 'Статьи, видео, рекомендации', icon: BookOpen, tone: 'green', action: () => openCategory('science') },
-    { id: 'support', title: 'Поддержка', desc: 'Сообщество, полезные контакты', icon: Heart, tone: 'coral', action: () => onChangeTab?.('community') },
-    { id: 'emergency', title: 'Экстренная информация', desc: 'Аллергии, лекарства, контакты', icon: Siren, tone: 'red', action: () => setStateMode('panic') }
+    { id: 'assistant', title: 'Помощник', desc: 'Получить следующий шаг', icon: BrainCircuit, tone: 'purple', action: () => onChangeTab?.('ai') },
+    { id: 'tracker', title: '2 приема сегодня', desc: 'Трекер', icon: Pill, tone: 'mint', badge: '2', action: () => openTrackerView('meds') },
+    { id: 'places', title: '14 мест рядом', desc: 'Места', icon: MapPin, tone: 'blue', badge: '14', action: () => onChangeTab?.('directory') },
+    { id: 'parents', title: '6 новых историй', desc: 'Родители', icon: HeartHandshake, tone: 'rose', badge: '6', action: () => onChangeTab?.('community') }
   ];
-
+  const homeTools: Array<{
+    id: string;
+    title: string;
+    icon: React.ElementType;
+    tone: HomeBentoTone;
+    action: () => void;
+  }> = [
+    { id: 'diagnostics', title: 'Диагностика', icon: Stethoscope, tone: 'amber', action: () => openCategory('pmpk') },
+    { id: 'video', title: 'Видео-анализ', icon: Video, tone: 'rose', action: () => openTrackerView('video') },
+    { id: 'specialists', title: 'Специалисты', icon: UsersRound, tone: 'indigo', action: () => onChangeTab?.('directory') },
+    { id: 'docs', title: 'Документы', icon: FileText, tone: 'purple', action: () => openCategory('pmpk') },
+    { id: 'reports', title: 'Отчеты', icon: ClipboardList, tone: 'teal', action: () => openTrackerView('report') },
+    { id: 'knowledge', title: 'База знаний', icon: BookOpen, tone: 'green', action: () => openCategory('science') },
+    { id: 'emergency', title: 'Экстренная информация', icon: Siren, tone: 'red', action: () => setStateMode('panic') },
+    { id: 'settings', title: 'Настройки', icon: Settings2, tone: 'orange', action: () => onChangeTab?.('profile') }
+  ];
+  const recentActivity = [
+    { id: 'meds', icon: Pill, title: 'Лекарство принято', time: '09:10', tone: 'mint' },
+    { id: 'journal', icon: Heart, title: 'Запись в дневнике', time: 'Вчера', tone: 'rose' },
+    { id: 'docs', icon: FileText, title: 'Загружен документ', time: 'Вчера 18:45', tone: 'purple' }
+  ] as const;
+  const homeHeroRows = [
+    { id: 'done', icon: CheckCircle2, tone: 'emerald', title: 'Выполнено задач: 2' },
+    { id: 'next', icon: Clock, tone: 'amber', title: 'Следующее действие через 40 минут' },
+    { id: 'doc', icon: FileText, tone: 'violet', title: 'Требуется загрузить документ' },
+    { id: 'last', icon: Heart, tone: 'rose', title: 'Последняя запись вчера' }
+  ] as const;
   // Segmented State control handler and visual renders
   const BREATH_PHASES = [
     { text: 'Вдох...', scale: 1.4, color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' },
@@ -1962,9 +1959,9 @@ export function NavigatorTab({
             <img src="/opora-child-avatar.png" alt="" className="opora-child-photo" />
           </div>
           <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#7C5CFF]/70">Сегодня для</p>
             <h1>{profile.childName}</h1>
-            <p>{childAgeLabel}</p>
-            <p>{profile.diagnosticStatus}</p>
+            <p>{childAgeLabel} · {profile.diagnosticStatus}</p>
             <button type="button" onClick={() => onChangeTab?.('profile')} className="opora-profile-pill">
               <UserRound size={15} />
               Профиль
@@ -1972,67 +1969,186 @@ export function NavigatorTab({
           </div>
         </div>
 
-        <div className="opora-hero-today">
-          <div className="opora-hero-date">
-            <CalendarDays size={16} />
-            <span>Сегодня</span>
+        <div className="mt-4 rounded-[28px] border border-white/75 bg-white/72 p-4 shadow-[0_12px_26px_rgba(76,63,120,0.08)] backdrop-blur-2xl">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#7C5CFF]/70">Сегодня для {profile.childName}</p>
+              <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#13273F]">Что важно сейчас</h2>
+            </div>
+            <span className="rounded-full bg-[#F2EEFF] px-3 py-1.5 text-[11px] font-extrabold text-[#7C5CFF]">
+              В фокусе
+            </span>
           </div>
-          <div className="opora-hero-reminders">
-            {homeReminderRows.map(row => {
+
+          <div className="mt-4 grid gap-2">
+            {homeHeroRows.map(row => {
               const RowIcon = row.icon;
+              const rowToneClasses = row.tone === 'emerald'
+                ? 'bg-[#EAF8F3] text-[#2FB58A]'
+                : row.tone === 'amber'
+                  ? 'bg-[#FFF6E8] text-[#E89124]'
+                  : row.tone === 'violet'
+                    ? 'bg-[#F4EEFF] text-[#7C5CFF]'
+                    : 'bg-[#FFF0F4] text-[#E55E84]';
               return (
-                <button
+                <div
                   key={row.id}
-                  type="button"
-                  onClick={row.id === 'docs' ? () => setNavigatorSubscreen('bureaucracy') : row.id === 'step' ? completeSoftScreening : undefined}
-                  className="opora-hero-reminder"
+                  className="flex items-center gap-3 rounded-[22px] border border-white/75 bg-white/78 px-3 py-2.5 shadow-[0_10px_20px_rgba(76,63,120,0.06)]"
                 >
-                  <span className="opora-hero-reminder-icon">
-                    <RowIcon size={19} />
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${rowToneClasses}`}>
+                    <RowIcon size={18} />
                   </span>
-                  <span className="opora-hero-reminder-time">{row.time}</span>
-                  <span className="opora-hero-reminder-title">{row.title}</span>
-                  <span className={cn('opora-hero-check', row.done && 'done')}>
-                    {row.done && <CheckCircle2 size={16} />}
-                  </span>
-                </button>
+                  <p className="min-w-0 text-[15px] font-extrabold leading-tight text-[#13273F]">{row.title}</p>
+                </div>
               );
             })}
           </div>
-        </div>
 
-        <button type="button" onClick={openTrackerView.bind(null, 'day')} className="opora-last-note">
-          <span className="opora-last-note-icon">
-            <NotebookPen size={18} />
-          </span>
-          <span className="min-w-0 flex-1 truncate">Последняя запись: {latestHomeNote}</span>
-          <span className="shrink-0 text-opora-text/70">10:15</span>
-          <ChevronRight size={16} className="shrink-0" />
-        </button>
+          <button
+            type="button"
+            onClick={() => openTrackerView('day')}
+            className="mt-4 flex w-full items-center justify-center rounded-[20px] bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] px-5 py-4 text-[15px] font-extrabold text-white shadow-[0_16px_28px_rgba(124,92,255,0.24)]"
+          >
+            Продолжить
+          </button>
+        </div>
       </section>
 
-      <section className="opora-product-grid px-5 pt-5">
-        {homeBentoCards.map(card => {
-          const CardIcon = card.icon;
-          return (
-          <button
-            key={card.id}
-            type="button"
-            onClick={card.action}
-            className={cn('opora-product-card', `tone-${card.tone}`, card.size === 'wide' && 'wide', card.size === 'tall' && 'tall')}
-          >
-            <span className="opora-product-icon">
-              <CardIcon size={31} />
-            </span>
-            {card.badge && <span className="opora-product-badge">{card.badge}</span>}
-            <span className="opora-product-copy">
-              <strong>{card.title}</strong>
-              <span>{card.desc}</span>
-            </span>
-            <ChevronRight size={19} className="opora-product-arrow" />
+      <section className="px-5 pt-5">
+        <div className="grid grid-cols-2 gap-3">
+          {homeQuickActions.map(card => {
+            const CardIcon = card.icon;
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={card.action}
+                className={cn('opora-product-card !h-[11.05rem]', `tone-${card.tone}`)}
+              >
+                <span className="opora-product-icon">
+                  <CardIcon size={31} />
+                </span>
+                {card.badge && <span className="opora-product-badge">{card.badge}</span>}
+                <span className="opora-product-copy">
+                  <strong>{card.title}</strong>
+                  <span>{card.desc}</span>
+                </span>
+                <ChevronRight size={19} className="opora-product-arrow" />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mx-5 mt-5 rounded-[32px] border border-white/80 bg-white/72 p-4 shadow-[0_16px_36px_rgba(124,92,255,0.08)] backdrop-blur-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#7C5CFF]/70">Маршрут Алишера</p>
+            <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#13273F]">Маршрут помощи</h2>
+          </div>
+          <span className="shrink-0 rounded-full bg-[#F4F8FF] px-3 py-1.5 text-[11px] font-extrabold text-[#5F6C87]">
+            Шаг {nextRouteStep} из 4
+          </span>
+        </div>
+
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#EDF1F6]">
+          <div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#58C987_0%,#E89124_58%,#7C5CFF_100%)]"
+            style={{ width: `${((nextRouteStep - 1) / 3) * 100}%` }}
+          />
+        </div>
+
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {routeSteps.map(step => {
+            const isDone = step.state === 'done';
+            const isCurrent = step.state === 'current';
+            const toneClasses = isDone
+              ? 'border-[#D8F1E3] bg-[#F2FBF6] text-[#2FA56D]'
+              : isCurrent
+                ? 'border-[#FFE1B4] bg-[#FFF8EC] text-[#E89124]'
+                : 'border-[#E6EBF2] bg-[#F7F9FC] text-[#97A1B2]';
+            return (
+              <div
+                key={step.number}
+                className={`min-h-[6.5rem] rounded-[22px] border p-3 shadow-[0_10px_20px_rgba(76,63,120,0.05)] ${toneClasses}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[20px] font-black leading-none">{step.number}</span>
+                  <span className={`h-2.5 w-2.5 rounded-full ${isDone ? 'bg-[#2FA56D]' : isCurrent ? 'bg-[#E89124]' : 'bg-[#B6C0CF]'}`} />
+                </div>
+                <p className="mt-3 text-[12px] font-extrabold leading-tight text-[#13273F]">{step.label}</p>
+                <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em]">
+                  {isDone ? 'Завершено' : isCurrent ? 'В процессе' : 'Ожидает'}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mx-5 mt-5 rounded-[32px] border border-white/80 bg-white/72 p-4 shadow-[0_16px_36px_rgba(124,92,255,0.08)] backdrop-blur-2xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#7C5CFF]/70">Инструменты</p>
+            <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#13273F]">Остальные разделы</h2>
+          </div>
+          <button type="button" onClick={() => openCategory('science')} className="shrink-0 text-sm font-bold text-[#6F4CF7]">
+            Все разделы
           </button>
-          );
-        })}
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          {homeTools.map(card => {
+            const CardIcon = card.icon;
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={card.action}
+                className={cn('opora-product-card !h-[8.25rem]', `tone-${card.tone}`)}
+              >
+                <span className="opora-product-icon">
+                  <CardIcon size={28} />
+                </span>
+                <span className="opora-product-copy">
+                  <strong>{card.title}</strong>
+                </span>
+                <ChevronRight size={19} className="opora-product-arrow" />
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mx-5 mt-5 rounded-[32px] border border-white/80 bg-white/72 p-4 shadow-[0_16px_36px_rgba(124,92,255,0.08)] backdrop-blur-2xl">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#7C5CFF]/70">Последняя активность</p>
+            <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#13273F]">Последние действия семьи</h2>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {recentActivity.map(item => {
+            const ItemIcon = item.icon;
+            const toneClass = item.tone === 'mint'
+              ? 'bg-[#EAF8F3] text-[#2FA56D]'
+              : item.tone === 'rose'
+                ? 'bg-[#FFF0F4] text-[#E55E84]'
+                : 'bg-[#F4EEFF] text-[#7C5CFF]';
+            return (
+              <div key={item.id} className="flex items-center gap-3 rounded-[22px] border border-white/75 bg-white/78 px-3 py-2.5 shadow-[0_10px_20px_rgba(76,63,120,0.06)]">
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${toneClass}`}>
+                  <ItemIcon size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-extrabold leading-tight text-[#13273F]">{item.title}</p>
+                  <p className="mt-1 text-[12px] font-semibold text-[#6F7B8E]">{item.time}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       {pendingDoctorAccessConfirmation && (

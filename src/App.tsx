@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Map, MessageSquareHeart, HeartHandshake, Compass, User, Stethoscope, ClipboardList } from 'lucide-react';
+import { Map, MessageSquareHeart, Compass, User, PlusCircle, Stethoscope } from 'lucide-react';
 import { NavigatorTab } from './components/NavigatorTab';
 import { AIAssistantTab } from './components/AIAssistantTab';
 import { DirectoryTab } from './components/DirectoryTab';
@@ -131,7 +131,7 @@ function AppContent() {
         </main>
 
         <nav className="opora-bottom-nav no-scrollbar z-50 w-full shrink-0 overflow-x-auto border-t px-3 pb-7 pt-3 backdrop-blur-2xl">
-          <ul className="flex min-w-max items-center justify-start gap-2 px-1">
+          <ul className="flex w-full items-end justify-between gap-1 px-1">
             {appRole === 'parent' && (
               <>
                 <NavItem 
@@ -147,10 +147,11 @@ function AppContent() {
                   onClick={() => setActiveTab('ai')} 
                 />
                 <NavItem
-                  icon={<ClipboardList size={22} strokeWidth={activeTab === 'tracker' ? 2.5 : 1.5} />}
-                  label="Трекер"
+                  icon={<PlusCircle size={22} strokeWidth={activeTab === 'tracker' ? 2.5 : 1.5} />}
+                  label="Действие"
                   isActive={activeTab === 'tracker'}
                   onClick={() => setActiveTab('tracker')}
+                  variant="action"
                 />
               </>
             )}
@@ -163,14 +164,6 @@ function AppContent() {
                 setActiveTab('directory');
               }} 
             />
-            {appRole === 'parent' && (
-              <NavItem 
-                icon={<HeartHandshake size={22} strokeWidth={activeTab === 'community' ? 2.5 : 1.5} />} 
-                label="Родители" 
-                isActive={activeTab === 'community'} 
-                onClick={() => setActiveTab('community')} 
-              />
-            )}
             <NavItem 
               icon={<User size={22} strokeWidth={activeTab === 'profile' ? 2.5 : 1.5} />} 
               label="Профиль" 
@@ -222,7 +215,35 @@ function AuthenticatedApp() {
   );
 }
 
-function NavItem({ icon, label, isActive, onClick }: { icon: React.ReactNode, label: string, isActive: boolean, onClick: () => void }) {
+function NavItem({
+  icon,
+  label,
+  isActive,
+  onClick,
+  variant = 'default'
+}: {
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+  variant?: 'default' | 'action';
+}) {
+  if (variant === 'action') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-current={isActive ? 'page' : undefined}
+        className={`flex min-w-[64px] flex-col items-center justify-center gap-1 transition-all duration-200 active:scale-95 ${isActive ? 'text-opora-sage' : 'text-opora-text hover:text-opora-navy'}`}
+      >
+        <div className="relative -mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] text-white shadow-[0_18px_34px_rgba(124,92,255,0.34)] transition-all duration-200">
+          {icon}
+        </div>
+        <span className={`text-[10px] font-bold tracking-normal transition-opacity duration-200 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 
 export function AuthScreen() {
   const { login, register, isLoading, error, clearError } = useAuth();
-  const [mode, setMode] = useState<'register' | 'login'>('register');
+  const [mode, setMode] = useState<'register' | 'login'>('login');
   const [fullName, setFullName] = useState('Родитель');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,6 +33,9 @@ export function AuthScreen() {
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-opora-text">
             Данные ребенка, дневник, прогресс и доступы врачей будут привязаны к вашему аккаунту.
+          </p>
+          <p className="mt-2 text-xs font-medium leading-relaxed text-opora-text/75">
+            Уже есть аккаунт? Войдите. Если вы здесь впервые, переключитесь на регистрацию.
           </p>
           </div>
 

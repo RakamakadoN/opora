@@ -5,6 +5,7 @@ import { useProfile } from '../context/ProfileContext';
 import { VERIFIED_DIRECTORY_ITEMS } from '../data/directory.generated';
 import { KZ_GOOGLE_PLACES_ITEMS } from '../data/kz-google-places.generated';
 import { InstitutionGuidePanel } from './InstitutionGuidePanel';
+import { PremiumPlacesHome } from './PremiumPlacesHome';
 
 interface Review {
   id: string;
@@ -836,26 +837,35 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
   return (
     <div className="min-h-full flex flex-col pt-9 pb-8 bg-opora-sand">
       <div className="px-6 mb-3">
-        <h1 className="font-serif text-[27px] font-medium text-opora-navy mb-1">Справочник</h1>
-        <p className="text-opora-text text-xs leading-relaxed">Живая база доверия: опыт родителей, проверка вручную и места, где детям было бережно.</p>
+        <h1 className="font-serif text-[27px] font-black text-opora-navy mb-1">Места</h1>
+        <p className="text-opora-text text-xs leading-relaxed">Проверено семьями • Живая база доверия для родителей и детей.</p>
       </div>
+
+      <PremiumPlacesHome onOpenFilter={(nextFilter) => setFilter(nextFilter)} />
 
       <div className="px-6 mb-3">
         <button
           type="button"
           onClick={() => setFilter('recommendations')}
-          className="w-full rounded-[20px] border border-opora-sage/25 bg-white/90 p-4 text-left shadow-sm transition-all active:scale-[0.99] dark:border-white/10 dark:bg-slate-800"
+          className="w-full overflow-hidden rounded-[32px] border border-white/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.9)_0%,rgba(243,238,255,0.88)_48%,rgba(236,250,247,0.9)_100%)] p-4 text-left shadow-[0_16px_36px_rgba(124,92,255,0.08)] backdrop-blur-2xl transition-all active:scale-[0.99]"
         >
-          <span className="mb-2 inline-flex rounded-full bg-opora-sage/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-opora-sage">
-            Главная ценность базы
-          </span>
-          <span className="block text-[18px] font-extrabold leading-tight text-opora-navy dark:text-slate-50">
-            Никто не знает ребенка лучше родителя
-          </span>
-          <span className="mt-1.5 block text-[12px] leading-relaxed text-opora-text dark:text-slate-300">
-            Мы собираем не рекламные адреса, а живой опыт семей: где приняли спокойно, где дали паузу, кто умеет работать с сенсорикой и неговорящими детьми.
-          </span>
-          <span className="mt-3 inline-flex items-center rounded-2xl bg-opora-navy px-3 py-2 text-xs font-extrabold text-white">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="mb-2 inline-flex rounded-full bg-[#F2EEFF] px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#6F4CF7]">
+                Главная ценность базы
+              </span>
+              <span className="block text-[19px] font-black leading-tight tracking-tight text-[#13273F]">
+                Никто не знает ребенка лучше родителя
+              </span>
+              <span className="mt-2 block text-[12px] leading-relaxed text-[#6F7B8E]">
+                Мы собираем не рекламные адреса, а живой опыт семей: где приняли спокойно, где дали паузу, кто умеет работать с сенсорикой и неговорящими детьми.
+              </span>
+            </div>
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[22px] bg-white/78 text-[#7C5CFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.82)]">
+              🤝
+            </span>
+          </div>
+          <span className="mt-4 inline-flex items-center rounded-full bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] px-4 py-2.5 text-xs font-extrabold text-white shadow-[0_12px_24px_rgba(124,92,255,0.18)]">
             Добавить родительский опыт
           </span>
         </button>
@@ -864,23 +874,23 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
       <div className="px-6 mb-3 space-y-2">
         {/* Search Input bar */}
         <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black/30 group-focus-within:text-opora-sage transition-colors" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8A94AA] group-focus-within:text-[#7C5CFF] transition-colors" size={18} />
           <input 
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Поиск по имени, специализации или тегам..." 
-            className="opora-directory-field w-full border border-black/5 py-2.5 pl-11 pr-4 rounded-2xl text-sm focus:outline-none focus:border-opora-sage focus:ring-4 focus:ring-opora-sage/10 text-opora-navy placeholder:text-black/30 transition-all font-medium"
+            className="opora-directory-field w-full border border-white/80 bg-white/76 py-3.5 pl-11 pr-4 rounded-[28px] text-sm focus:outline-none focus:border-[#7C5CFF]/20 focus:ring-4 focus:ring-[#7C5CFF]/8 text-[#13273F] placeholder:text-[#A0A9BB] transition-all font-semibold shadow-[0_12px_28px_rgba(124,92,255,0.06)] backdrop-blur-2xl"
           />
         </div>
 
         {/* City/Region Filter Selector */}
         <div className="flex gap-2 relative group">
-          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-opora-sage transition-transform group-hover:scale-110" size={18} />
+          <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-[#7C5CFF] transition-transform group-hover:scale-110" size={18} />
           <select 
             value={selectedCity}
             onChange={(e) => setSelectedCity(e.target.value)}
-            className="opora-directory-field w-full border border-black/5 py-2.5 pl-11 pr-4 rounded-2xl text-sm focus:outline-none focus:border-opora-sage focus:ring-4 focus:ring-opora-sage/10 text-opora-navy appearance-none transition-all cursor-pointer font-medium"
+            className="opora-directory-field w-full border border-white/80 bg-white/76 py-3.5 pl-11 pr-4 rounded-[28px] text-sm focus:outline-none focus:border-[#7C5CFF]/20 focus:ring-4 focus:ring-[#7C5CFF]/8 text-[#13273F] appearance-none transition-all cursor-pointer font-semibold shadow-[0_12px_28px_rgba(124,92,255,0.06)] backdrop-blur-2xl"
           >
             {cities.map(city => (
               <option key={city} value={city}>{city}</option>
@@ -895,23 +905,23 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
       </div>
 
       <div className="px-6 mb-2">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-opora-text/60 mb-2">Что ищем?</p>
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.24em] text-[#91A0B7] mb-2">Что ищем?</p>
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setFilter('recommendations')}
             className={cn(
-              "opora-directory-scenario col-span-2 text-left p-3 rounded-2xl border transition-all active:scale-[0.98]",
+              "opora-directory-scenario col-span-2 overflow-hidden text-left p-4 rounded-[28px] border transition-all active:scale-[0.98] shadow-[0_12px_28px_rgba(124,92,255,0.06)] backdrop-blur-2xl",
               filter === 'recommendations'
-                ? "bg-opora-navy text-white border-opora-navy"
-                : "opora-directory-filter border-opora-sage/25 text-opora-navy"
+                ? "bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] text-white border-transparent"
+                : "bg-white/72 border-white/80 text-[#13273F]"
             )}
           >
             <span className="text-xl leading-none">🤝</span>
             <span className="block text-sm font-extrabold mt-2 leading-tight">Проверено семьями</span>
             <span className={cn(
               "block text-[11px] mt-0.5 leading-snug",
-              filter === 'recommendations' ? "text-white/75" : "text-opora-text/70"
+              filter === 'recommendations' ? "text-white/80" : "text-[#6F7B8E]"
             )}>
               добавить рекомендацию или посмотреть, что советуют родители
             </span>
@@ -920,19 +930,19 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
             <button
               key={scenario.id}
               type="button"
-              onClick={() => setFilter(scenario.id)}
-              className={cn(
-                "opora-directory-scenario text-left p-3 rounded-2xl border transition-all active:scale-[0.98]",
-                filter === scenario.id
-                  ? "bg-opora-navy text-white border-opora-navy"
-                  : "opora-directory-filter border-black/5 text-opora-navy"
-              )}
-            >
-              <span className="text-xl leading-none">{scenario.icon}</span>
+            onClick={() => setFilter(scenario.id)}
+            className={cn(
+              "opora-directory-scenario text-left p-3 rounded-[28px] border transition-all active:scale-[0.98] shadow-[0_10px_24px_rgba(124,92,255,0.05)] backdrop-blur-2xl",
+              filter === scenario.id
+                  ? "bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] text-white border-transparent"
+                  : "bg-white/72 border-white/80 text-[#13273F]"
+            )}
+          >
+            <span className="text-xl leading-none">{scenario.icon}</span>
               <span className="block text-sm font-extrabold mt-2 leading-tight">{scenario.label}</span>
               <span className={cn(
-                "block text-[11px] mt-0.5 leading-snug",
-                filter === scenario.id ? "text-white/75" : "text-opora-text/70"
+              "block text-[11px] mt-0.5 leading-snug",
+                filter === scenario.id ? "text-white/80" : "text-[#6F7B8E]"
               )}>
                 {scenario.hint}
               </span>
@@ -942,10 +952,10 @@ export function DirectoryTab({ initialFilter }: { initialFilter?: DirectoryFilte
             type="button"
             onClick={() => setFilter('all')}
             className={cn(
-              "opora-directory-scenario text-left p-3 rounded-2xl border transition-all active:scale-[0.98]",
+              "opora-directory-scenario text-left p-3 rounded-[28px] border transition-all active:scale-[0.98] shadow-[0_10px_24px_rgba(124,92,255,0.05)] backdrop-blur-2xl",
               filter === 'all'
-                ? "bg-opora-navy text-white border-opora-navy"
-                : "opora-directory-filter border-black/5 text-opora-navy"
+                ? "bg-[linear-gradient(180deg,#8B74FF_0%,#6D4FF3_100%)] text-white border-transparent"
+                : "bg-white/72 border-white/80 text-[#13273F]"
             )}
           >
             <span className="text-xl leading-none">🗺️</span>

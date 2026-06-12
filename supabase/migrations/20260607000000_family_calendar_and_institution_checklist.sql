@@ -11,11 +11,6 @@ create table if not exists families (
 alter table if exists children add column if not exists family_id uuid;
 alter table if exists children add column if not exists color_token text;
 alter table if exists children alter column age_years set default 0;
-alter table if exists children drop constraint if exists children_local_child_id_key;
-alter table if exists children drop constraint if exists children_family_local_child_id_key;
-alter table if exists children drop constraint if exists children_family_id_local_child_id_key;
-alter table if exists children
-  add constraint children_family_id_local_child_id_key unique (family_id, local_child_id);
 
 do $$
 begin
