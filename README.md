@@ -1,53 +1,53 @@
-# ОПОРА — цифровой навигатор помощи семье
+# OPORA — A Digital Support Navigator for Families
 
-**ОПОРА** — приложение для родителей детей с особенностями развития и специалистов, которые их сопровождают. Оно помогает пройти путь от первых вопросов и наблюдений до подготовки к приёму, организации повседневной заботы и взаимодействия с врачом — последовательно, без информационного хаоса.
+**OPORA** is an application for parents of children with developmental differences and the professionals who support them. It helps families navigate the journey from early questions and observations to preparing for appointments, organizing day-to-day care, and working with healthcare professionals — one step at a time, without information overload.
 
-> **Главная идея:** родителю не нужно держать в голове всё сразу. ОПОРА помогает понять следующий шаг, собрать важные факты и прийти к специалисту подготовленным.
+> **Our guiding idea:** Parents shouldn't have to keep everything in their heads. OPORA helps them identify the next step, organize important information, and arrive at appointments better prepared.
 
-**Статус:** развивающийся MVP / прототип. Некоторые разделы и источники данных требуют дальнейшей проверки и настройки перед использованием в реальной практике.
+**Status:** Evolving MVP / prototype. Some features and data sources still require validation and configuration before use in real-world care settings.
 
-[Открыть веб-приложение](https://opora-seven.vercel.app)
+[Explore the web app](https://opora-seven.vercel.app)
 
-## Какую проблему решает ОПОРА
+## The Problem OPORA Addresses
 
-Семья, столкнувшаяся с вопросами развития ребёнка, часто вынуждена одновременно искать надёжную информацию, записывать наблюдения, разбираться в документах, находить специалистов и координировать назначения. Данные при этом теряются между чатами, заметками и бумажными папками.
+Families navigating questions about a child's development often have to find reliable information, document observations, understand administrative requirements, locate specialists, and coordinate care — all at once. Important details get scattered across messages, notes, and paper records.
 
-ОПОРА объединяет эти задачи в один понятный маршрут: **что происходит → что зафиксировать → что подготовить → с кем обсудить → что делать дальше**.
+OPORA brings these activities together in a clear path: **understand what's happening → record observations → prepare information → talk to the right professional → decide on the next step**.
 
-## Возможности приложения
+## Features
 
-| Раздел | Что помогает делать |
+| Area | What it helps with |
 | --- | --- |
-| **Навигатор** | Ориентироваться в этапах помощи, планировать следующие действия и готовиться к консультациям |
-| **ИИ-помощник** | Формулировать вопросы врачу, структурировать наблюдения и разбирать сложные формулировки простым языком |
-| **Трекер заботы** | Фиксировать расписание и факты по лекарствам, питанию, реакциям и событиям; собирать отчёт для приёма |
-| **Документы и учреждения** | Готовить чек-листы, отслеживать сроки и разбираться в маршрутах ПМПК, МСЭ и других учреждений |
-| **Справочник мест** | Искать специалистов, центры и адаптированные сервисы; сведения о местах требуют самостоятельной проверки |
-| **Сообщество** | Делиться вопросами и опытом в родительском разделе |
-| **Кабинет врача** | Просматривать карточки детей и наблюдения, работать с сенсорным паспортом, планом поддержки и заданиями для семьи |
+| **Navigator** | Understand stages of support, plan next steps, and prepare for consultations |
+| **AI Assistant** | Draft questions for clinicians, organize observations, and explain complex terminology in plain language |
+| **Care Tracker** | Record schedules and observations related to medications, food, reactions, and daily events; prepare visit summaries |
+| **Documents & Institutions** | Build checklists, track deadlines, and navigate PMPK (psychological-medical-pedagogical commissions), medical-social assessments, and other administrative processes |
+| **Places Directory** | Explore specialists, centers, and accessible or accommodating services; listings should be independently verified |
+| **Community** | Ask questions and share experiences in a parent-focused space |
+| **Clinician Workspace** | Review child profiles and observations, work with sensory profiles, support plans, and family activities |
 
-В приложении предусмотрены роли **«Я родитель»** и **«Я врач»**. Интерфейс ориентирован прежде всего на мобильное использование; в репозитории также находятся проекты Android и iOS на Capacitor.
+OPORA supports two roles: **“I'm a parent”** and **“I'm a doctor.”** The interface is designed primarily for mobile use. The repository also includes Android and iOS projects built with Capacitor.
 
-## Принципы
+## Our Principles
 
-- **Бережный подход.** Вместо пугающих выводов — ясные шаги и поддержка в организации повседневных задач.
-- **Факты вместо догадок.** Наблюдения, назначения и события фиксируются отдельно от интерпретаций.
-- **Решение остаётся за человеком.** ИИ помогает готовить информацию и вопросы, но не заменяет врача или другого специалиста.
-- **Контекст семьи важен.** Маршрут зависит от ситуации ребёнка, а не сводится к универсальному списку советов.
+- **Support without alarm.** Clear next steps instead of overwhelming conclusions.
+- **Observations before assumptions.** Recorded events, care instructions, and observations are kept distinct from interpretations.
+- **People remain in control.** AI helps organize information and formulate questions; it does not replace clinical or professional judgment.
+- **Every family has its own context.** Guidance should reflect the child's situation rather than rely on a one-size-fits-all checklist.
 
-> **Медицинское предупреждение:** ОПОРА не является медицинским изделием, не ставит диагнозы, не назначает и не отменяет лечение и не заменяет очную консультацию. Советы ИИ, сведения о специалистах и учреждениях необходимо проверять. При угрозе жизни и здоровью следует обратиться за экстренной помощью.
+> **Medical disclaimer:** OPORA is not a medical device. It does not diagnose conditions, prescribe or discontinue treatment, or replace an in-person medical consultation. AI-generated guidance and information about professionals or institutions must be independently verified. In a medical emergency, contact local emergency services.
 
-## Технологии
+## Technology Stack
 
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS
 - **Backend:** Node.js, Express
-- **Данные:** PostgreSQL; серверные миграции для Railway Postgres
-- **ИИ:** серверные интеграции с AI API при наличии необходимых ключей
-- **Мобильные проекты:** Capacitor (Android / iOS)
+- **Data:** PostgreSQL with server-side migrations for Railway Postgres
+- **AI:** Server-side AI API integrations, when configured with the required credentials
+- **Mobile projects:** Capacitor (Android / iOS)
 
-## Локальный запуск
+## Getting Started Locally
 
-Требования: **Node.js 22** и **npm 10+**.
+Requirements: **Node.js 22** and **npm 10+**.
 
 ```bash
 npm install
@@ -55,15 +55,15 @@ cp .env.example .env
 npm run dev
 ```
 
-По умолчанию сервер запускается на `http://localhost:3000`. Чтобы использовать порт 5555:
+By default, the server runs at `http://localhost:3000`. To use port 5555:
 
 ```bash
 PORT=5555 npm run dev
 ```
 
-Перед запуском интеграций заполните необходимые переменные окружения в локальном `.env`. **Не коммитьте ключи API, медицинские документы и персональные данные семей.**
+Configure the required environment variables in your local `.env` before using integrations. **Never commit API keys, medical records, or families' personal data.**
 
-## Сборка и production
+## Build & Production
 
 ```bash
 npm ci
@@ -72,19 +72,19 @@ npm run build
 NODE_ENV=production PORT=3000 npm run start
 ```
 
-Healthcheck: `GET /api/health`.
+Health check: `GET /api/health`.
 
-### Развёртывание на Railway
+### Deploying to Railway
 
-В репозитории есть `railway.json`.
+The repository includes `railway.json`.
 
 - **Build command:** `npm run build`
 - **Start command:** `npm run start`
-- **Переменные окружения:** см. `.env.example`
-- **PostgreSQL:** добавьте database service в Railway и передайте `DATABASE_URL` в сервис приложения. При запуске сервер применяет `db/railway-postgres.sql`.
+- **Environment variables:** See `.env.example`
+- **PostgreSQL:** Add a database service in Railway and set `DATABASE_URL` for the application service. On startup, the server applies `db/railway-postgres.sql`.
 
-Дополнительные детали — в [DEPLOYMENT.md](./DEPLOYMENT.md).
+For more details, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ---
 
-**ОПОРА — не вместо родителей и специалистов, а рядом с ними: чтобы следующий шаг был понятнее.**
+**OPORA doesn't replace parents or professionals. It stands alongside them, making the next step easier to understand.**
